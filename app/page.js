@@ -339,7 +339,7 @@ export default function Page() {
   return (
     <div style={S.root}>
       <div style={S.hdr}>
-        <div><div style={S.logo}>Asistente de Radiología</div><div style={S.sub}>Estación de informes</div></div>
+        <div><div style={S.logo}>asistente_de_radiolog<span style={{ color: isDark ? "#e8c547" : "#b8860b", textShadow: isDark ? "0 0 8px rgba(232,197,71,0.4)" : "none" }}>IA</span></div><div style={S.sub}>Estación de trabajo <span style={{ letterSpacing: 1, opacity: 0.7 }}>·</span> <span style={{ fontStyle: "italic", letterSpacing: 1, fontSize: 9, opacity: 0.6 }}>by Alexis Espinosa</span></div></div>
         <div style={S.hdrR}>
           <ThemeToggle themePref={themePref} setThemePref={setThemePref} P={P} />
           <div style={{ position: "relative" }}>
