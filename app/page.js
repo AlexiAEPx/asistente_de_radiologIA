@@ -7,6 +7,13 @@ const MODELS = [
   { id: "claude-opus-4-6", label: "Opus", cost: "💰💰💰", desc: "Máxima calidad" },
 ];
 
+// Pricing per million tokens (USD) — https://docs.anthropic.com/en/docs/about-claude/pricing
+const PRICING = {
+  "claude-haiku-4-5-20251001":  { input: 0.80, output: 4.00 },
+  "claude-sonnet-4-20250514":   { input: 3.00, output: 15.00 },
+  "claude-opus-4-6":            { input: 15.00, output: 75.00 },
+};
+
 const palette = (dark) => dark ? {
   bg: "#0e0e18", bg2: "#111120", bg3: "#1a1a2e",
   text: "#e0ddd5", text2: "#aaa", text3: "#777", text4: "#555",
@@ -217,6 +224,7 @@ export default function Page() {
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
   const [ff, setFf] = useState("");
+  const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
 
   const fEndRef = useRef(null);
   const cEndRef = useRef(null);
@@ -249,7 +257,21 @@ export default function Page() {
       throw new Error(errData.error || `Error ${r.status}`);
     }
     const d = await r.json();
-    return (d.content || []).map(b => b.text || "").join("");
+    const text = (d.content || []).map(b => b.text || "").join("");
+    // Track spending from usage data returned by the Anthropic API
+    if (d.usage) {
+      const p = PRICING[model] || PRICING["claude-sonnet-4-20250514"];
+      const inTok = d.usage.input_tokens || 0;
+      const outTok = d.usage.output_tokens || 0;
+      const cost = (inTok * p.input + outTok * p.output) / 1_000_000;
+      setSpending(prev => ({
+        totalCost: prev.totalCost + cost,
+        inputTokens: prev.inputTokens + inTok,
+        outputTokens: prev.outputTokens + outTok,
+        calls: prev.calls + 1,
+      }));
+    }
+    return text;
   };
 
   const clean = (s) => { let t = s.trim(); if (t.startsWith("```html")) t = t.slice(7); else if (t.startsWith("```")) t = t.slice(3); if (t.endsWith("```")) t = t.slice(0, -3); return t.trim(); };
@@ -284,7 +306,7 @@ export default function Page() {
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
 
@@ -341,6 +363,27 @@ export default function Page() {
       <div style={S.hdr}>
         <div><div style={S.logo}>asistente_de_radiolog<span style={{ color: isDark ? "#e8c547" : "#b8860b", textShadow: isDark ? "0 0 8px rgba(232,197,71,0.4)" : "none" }}>IA</span></div><div style={S.sub}>Estación de trabajo <span style={{ letterSpacing: 1, opacity: 0.7 }}>·</span> <span style={{ fontStyle: "italic", letterSpacing: 1, fontSize: 9, opacity: 0.6 }}>by Alexis Espinosa</span></div></div>
         <div style={S.hdrR}>
+          {spending.calls > 0 && <div style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "4px 12px",
+            borderRadius: 8, border: "1px dashed " + P.goldBorder,
+            background: isDark ? "rgba(196,151,60,0.06)" : "rgba(150,114,42,0.04)",
+            fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 11, color: P.text2,
+          }}>
+            <span style={{ fontSize: 14 }}>🧾</span>
+            <span style={{ fontWeight: 700, color: spending.totalCost >= 0.10 ? "#e67e22" : P.gold, fontSize: 13 }}>
+              {spending.totalCost < 0.01
+                ? (spending.totalCost * 1000).toFixed(2) + " milésimas $"
+                : spending.totalCost < 1
+                  ? (spending.totalCost * 100).toFixed(2) + "¢"
+                  : "$" + spending.totalCost.toFixed(2)}
+            </span>
+            <span style={{ color: P.text4 }}>|</span>
+            <span title={`${spending.inputTokens.toLocaleString()} entrada + ${spending.outputTokens.toLocaleString()} salida`}>
+              {((spending.inputTokens + spending.outputTokens) / 1000).toFixed(1)}k tok
+            </span>
+            <span style={{ color: P.text4 }}>|</span>
+            <span>{spending.calls} {spending.calls === 1 ? "llamada" : "llamadas"}</span>
+          </div>}
           <ThemeToggle themePref={themePref} setThemePref={setThemePref} P={P} />
           <div style={{ position: "relative" }}>
             <button onClick={() => setShowMP(!showMP)} style={S.mBtn}>{sm?.cost} {sm?.label} ▾</button>
