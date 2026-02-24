@@ -375,17 +375,17 @@ export default function Page() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+              <div style={{ ...S.ia, borderTop: "none", borderBottom: "1px solid " + P.goldBorder }}><div style={S.ir}>
+                <textarea ref={fInpRef} value={fInput} onChange={e => setFInput(e.target.value)} onKeyDown={e => hk(e, sendFindings)} onFocus={() => setFf("fi")} onBlur={() => setFf("")} placeholder='Hallazgos, "completa", "plagia"...' style={S.ta(ff === "fi")} rows={2} disabled={ldReport} />
+                <button onClick={sendFindings} disabled={ldReport || !fInput.trim()} style={S.sb(ldReport || !fInput.trim())}>▶</button>
+              </div><div style={S.ht}>Shift+Enter nueva línea</div></div>
+              {err && <div style={S.er}>{err}</div>}
               <div style={S.ca}>
                 {fMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>✍️</div><div style={S.phT}>Dicta tus hallazgos</div><div style={S.phD}>Escribe lo que ves en las imágenes.</div></div>}
                 {fMsgs.map((m, i) => m.role === "user" ? <div key={i} style={S.ub}>{m.content}</div> : <div key={i} style={S.ab}>✅ Informe {i === fMsgs.length - 1 ? "generado" : "actualizado"}</div>)}
                 {ldReport && <div style={S.ab}><LoadingDots text="Redactando informe..." /></div>}
                 <div ref={fEndRef} />
               </div>
-              {err && <div style={S.er}>{err}</div>}
-              <div style={S.ia}><div style={S.ir}>
-                <textarea ref={fInpRef} value={fInput} onChange={e => setFInput(e.target.value)} onKeyDown={e => hk(e, sendFindings)} onFocus={() => setFf("fi")} onBlur={() => setFf("")} placeholder='Hallazgos, "completa", "plagia"...' style={S.ta(ff === "fi")} rows={2} disabled={ldReport} />
-                <button onClick={sendFindings} disabled={ldReport || !fInput.trim()} style={S.sb(ldReport || !fInput.trim())}>▶</button>
-              </div><div style={S.ht}>Shift+Enter nueva línea</div></div>
             </div>
           )}
         </div>
