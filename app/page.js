@@ -275,7 +275,10 @@ export default function Page() {
     const t = cInput.trim(); if (!t || ldChat) return; setErr("");
     const um = { role: "user", content: t }; const nm = [...cMsgs, um];
     setCMsgs(nm); setCInput(""); setLdChat(true);
-    try { setCMsgs(p => [...p, { role: "assistant", content: await callAPI(CHAT_SYS(ctx, report, analysis), nm, 2048) }]); }
+    try {
+  const response = await callAPI(CHAT_SYS(ctx, report, analysis), nm, 2048);
+  setCMsgs(p => [...p, { role: "assistant", content: response }]);
+}
     catch (e) { setErr("Error chat: " + e.message); } setLdChat(false);
   };
 
