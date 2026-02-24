@@ -63,32 +63,32 @@ const buildCtxBlock = (c) => {
   return p.length ? "\n\n## CONTEXTO CLÍNICO\n" + p.join("\n\n") : "";
 };
 
-const REPORT_SYS = (c) => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
+const REPORT_SYS = (c, isDark) => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
 ${buildCtxBlock(c)}
 
 ## COLORES (OBLIGATORIO en cada fragmento)
 - Patológico importante: <span style="color:#CC0000;font-style:italic;font-weight:bold;">texto</span>
 - Patológico leve: <span style="color:#D2691E;font-style:italic;">texto</span>
 - Normal relevante: <span style="color:#2E8B57;">texto</span>
-- Normal relleno: <span style="color:#444;">texto</span>
+- Normal relleno: <span style="color:${isDark ? '#aaa' : '#444'};">texto</span>
 
 ## HTML
 <div style="font-family:'Plus Jakarta Sans','Segoe UI',Calibri,sans-serif;line-height:1.7;font-size:14px;">
-<p style="font-weight:bold;font-size:1.15em;color:#222;margin-bottom:0.3em;">[TIPO ESTUDIO] [URGENTE/CÓDIGO ICTUS]</p>
-<p style="color:#666;font-size:0.95em;">[Técnica]</p>
-<p style="color:#666;font-size:0.95em;">[Referencia previo]</p>
-<p style="font-weight:bold;margin-top:1.2em;font-size:1.05em;color:#222;border-bottom:1px solid #ccc;padding-bottom:4px;">HALLAZGOS</p>
-<div style="margin-top:1.2em;padding-top:0.6em;border-top:1px solid #eee;">
-<p style="font-weight:bold;color:#555;text-transform:uppercase;font-size:0.95em;letter-spacing:0.5px;">Estructura</p>
+<p style="font-weight:bold;font-size:1.15em;margin-bottom:0.3em;">[TIPO ESTUDIO] [URGENTE/CÓDIGO ICTUS]</p>
+<p style="font-size:0.95em;opacity:0.7;">[Técnica]</p>
+<p style="font-size:0.95em;opacity:0.7;">[Referencia previo]</p>
+<p style="font-weight:bold;margin-top:1.2em;font-size:1.05em;padding-bottom:4px;">HALLAZGOS</p>
+<div style="margin-top:0.8em;">
+<p style="font-weight:bold;text-transform:uppercase;font-size:0.95em;letter-spacing:0.5px;opacity:0.65;">Estructura</p>
 <p>[Descripción con spans colores]</p>
 </div>
-<div style="margin-top:1.5em;padding-top:0.8em;border-top:2px solid #888;">
-<p style="font-size:1.25em;font-weight:bold;color:#222;">CONCLUSIÓN:</p>
+<div style="margin-top:1.5em;">
+<p style="font-size:1.25em;font-weight:bold;">CONCLUSIÓN:</p>
 <ul style="margin-top:0.5em;padding-left:1.2em;">
 <li style="margin-bottom:0.4em;"><strong style="color:#CC0000;">[Hallazgo]</strong></li>
 </ul>
 </div>
-<div style="margin-top:0.8em;"><p style="font-weight:bold;color:#555;">RECOMENDACIÓN:</p><p style="color:#444;font-size:0.95em;">[Si procede]</p></div>
+<div style="margin-top:0.8em;"><p style="font-weight:bold;opacity:0.65;">RECOMENDACIÓN:</p><p style="font-size:0.95em;">[Si procede]</p></div>
 </div>
 
 ## REGLAS
@@ -280,12 +280,12 @@ export default function Page() {
     const t = fInput.trim(); if (!t || ldReport) return;
     setErr(""); const um = { role: "user", content: t }; const nm = [...fMsgs, um];
     setFMsgs(nm); setFInput(""); setLdReport(true); setRTab("report");
-    try { const h = clean(await callAPI(REPORT_SYS(ctx), nm)); setFMsgs(p => [...p, { role: "assistant", content: h }]); setReport(h); setCtxSnap(JSON.stringify(ctx)); }
+    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), nm)); setFMsgs(p => [...p, { role: "assistant", content: h }]); setReport(h); setCtxSnap(JSON.stringify(ctx)); }
     catch (e) { setErr("Error informe: " + e.message); } setLdReport(false);
   };
   const regenReport = async () => {
     if (!fMsgs.length || ldReport) return; setLdReport(true); setErr(""); setRTab("report");
-    try { const h = clean(await callAPI(REPORT_SYS(ctx), fMsgs)); setReport(h); }
+    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), fMsgs)); setReport(h); }
     catch (e) { setErr("Error regenerar: " + e.message); } setLdReport(false);
   };
   const genAnalysis = async () => {
@@ -345,7 +345,7 @@ export default function Page() {
     ht: { fontSize: 10, color: P.text4, marginTop: 3 },
     rh: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px", borderBottom: "1px solid " + P.reportHeaderBorder, background: P.reportHeader, flexShrink: 0, flexWrap: "wrap", gap: 5 },
     rt: { fontSize: 13, fontWeight: 600, color: P.reportTitleColor, letterSpacing: 0.5, textTransform: "uppercase" },
-    rc: { flex: 1, overflowY: "auto", padding: "20px 24px", background: P.reportBg },
+    rc: { flex: 1, overflowY: "auto", padding: "20px 24px", background: P.reportBg, color: P.text },
     cb: (v, a) => ({ padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: a ? "#22c55e" : v === "p" ? P.gold : P.goldBg, color: a ? "#fff" : v === "p" ? "#fff" : P.gold }),
     lg: { display: "flex", gap: 10, flexWrap: "wrap", padding: "7px 14px", borderTop: "1px solid " + P.legendBorder, background: P.legendBg, flexShrink: 0 },
     ld: (c) => ({ width: 7, height: 7, borderRadius: "50%", background: c }),
@@ -443,8 +443,15 @@ export default function Page() {
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={S.rh}><span style={S.rt}>Informe</span>{report && <div style={{ display: "flex", gap: 5 }}><button onClick={cpText} style={S.cb("p", copied === "t")}>{copied === "t" ? "✓ Copiado" : "📋 Texto"}</button><button onClick={cpHtml} style={S.cb("s", copied === "h")}>{copied === "h" ? "✓ Copiado" : "HTML"}</button></div>}</div>
-            <div style={S.rc}>{report ? <div dangerouslySetInnerHTML={{ __html: report }} /> : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
-            {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal rel."], ["#444", "Normal"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
+            <div className="rpt-content" style={S.rc}><style>{`
+.rpt-content [style*="border-top:1px solid #eee"],.rpt-content [style*="border-top:2px solid #888"]{border-top-color:transparent!important}
+.rpt-content [style*="border-bottom:1px solid #ccc"]{border-bottom-color:transparent!important}
+${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#333"]{color:inherit!important}
+.rpt-content p[style*="color:#555"],.rpt-content p[style*="color:#666"]{color:${P.text3}!important}
+.rpt-content p[style*="color:#444"]{color:${P.text2}!important}
+.rpt-content span[style*="color:#444"]{color:#aaa!important}` : ''}
+`}</style>{report ? <div dangerouslySetInnerHTML={{ __html: report }} /> : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
+            {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal rel."], [isDark ? "#aaa" : "#444", "Normal"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
 
           {rTab === "analysis" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
