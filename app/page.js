@@ -27,6 +27,9 @@ const palette = (dark) => dark ? {
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.08)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#ccc",
   chatInputBg: "rgba(255,255,255,0.04)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#e0ddd5",
   chatInputAreaBg: "#0f1f16", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
+  keyIdeasBg: "linear-gradient(180deg,#1a1520,#181422)", keyIdeasHeader: "#1c1628", keyIdeasHeaderBorder: "rgba(217,119,6,0.2)", keyIdeasTitleColor: "#fbbf24",
+  justifBg: "linear-gradient(180deg,#1a1424,#18122a)", justifHeader: "#1e1630", justifHeaderBorder: "rgba(168,85,247,0.2)", justifTitleColor: "#c084fc",
+  diffDiagBg: "linear-gradient(180deg,#141a1e,#121820)", diffDiagHeader: "#161e24", diffDiagHeaderBorder: "rgba(239,68,68,0.2)", diffDiagTitleColor: "#f87171",
   dropdownBg: "#1a1a2e", dropdownShadow: "0 8px 24px rgba(0,0,0,0.5)",
   errorBg: "rgba(204,0,0,0.1)", errorBorder: "rgba(204,0,0,0.2)", errorText: "#ff6b6b",
   urgentBg: "rgba(220,38,38,0.15)", ictusBg: "rgba(220,38,38,0.25)",
@@ -43,6 +46,9 @@ const palette = (dark) => dark ? {
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.06)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#555",
   chatInputBg: "rgba(255,255,255,0.8)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#333",
   chatInputAreaBg: "#f0fdf4", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
+  keyIdeasBg: "linear-gradient(180deg,#fffbf5,#fef7ed)", keyIdeasHeader: "#fef3e2", keyIdeasHeaderBorder: "#fde68a", keyIdeasTitleColor: "#92400e",
+  justifBg: "linear-gradient(180deg,#fdf8ff,#f5f0ff)", justifHeader: "#f3e8ff", justifHeaderBorder: "#d8b4fe", justifTitleColor: "#6b21a8",
+  diffDiagBg: "linear-gradient(180deg,#fef9f9,#fdf5f5)", diffDiagHeader: "#fef2f2", diffDiagHeaderBorder: "#fecaca", diffDiagTitleColor: "#991b1b",
   dropdownBg: "#faf8f5", dropdownShadow: "0 8px 24px rgba(0,0,0,0.12)",
   errorBg: "rgba(204,0,0,0.06)", errorBorder: "rgba(204,0,0,0.15)", errorText: "#cc0000",
   urgentBg: "rgba(220,38,38,0.08)", ictusBg: "rgba(220,38,38,0.12)",
@@ -147,6 +153,158 @@ ${report ? "\n## INFORME\n" + report : ""}
 ${analysis ? "\n## ANÁLISIS\n" + analysis : ""}
 Responde directo, profesional. HTML para complejas, texto para breves. Español.`;
 
+const KEY_IDEAS_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica. A partir del informe y análisis del caso, genera exactamente 10 ideas clave que un radiólogo debe llevarse de este caso. Genera HTML profesional con estilos inline.
+${buildCtxBlock(c)}
+
+## INFORME
+${report}
+${analysis ? "\n## ANÁLISIS\n" + analysis : ""}
+
+## FORMATO HTML
+<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
+<p style="font-weight:bold;font-size:1.1em;color:#92400e;margin-bottom:12px;border-bottom:2px solid #fde68a;padding-bottom:8px;">💡 10 IDEAS CLAVE DEL CASO</p>
+<div style="margin-bottom:10px;padding:12px 16px;background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;">
+<p><strong style="color:#b45309;">1.</strong> [Idea clave concisa y práctica]</p>
+</div>
+... (repetir para las 10 ideas)
+</div>
+
+## REGLAS
+- Exactamente 10 ideas, numeradas
+- Cada idea: 1-2 frases concisas y de alto valor práctico
+- Enfocadas en lo que el radiólogo debe recordar: hallazgos críticos, diagnóstico, seguimiento, errores a evitar, correlaciones clínico-radiológicas
+- Ordenadas de mayor a menor relevancia clínica
+- Incluir si aplica: diagnóstico principal, hallazgos incidentales, recomendaciones de seguimiento, signos radiológicos clave, diagnósticos diferenciales importantes, errores frecuentes a evitar
+- Usar colores en el número: #CC0000 para ideas sobre patología grave, #d97706 para hallazgos moderados, #2E8B57 para normalidad relevante
+
+SOLO HTML. Sin explicaciones adicionales.`;
+
+const JUSTIFICATION_SYS = (c, report) => `Eres un experto en justificación de pruebas de imagen y radioprotección. Analiza si la prueba radiológica solicitada estaba clínicamente justificada según las guías de práctica clínica, criterios de adecuación y principios ALARA. Genera HTML profesional con estilos inline.
+${buildCtxBlock(c)}
+
+## INFORME RADIOLÓGICO
+${report}
+
+## FORMATO HTML
+<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
+<div style="margin-bottom:1.5em;padding:16px;border-radius:8px;border-left:4px solid [COLOR_SEGÚN_VEREDICTO];">
+<p style="font-weight:bold;font-size:1.2em;margin-bottom:8px;">[VEREDICTO_ICONO] VEREDICTO: [JUSTIFICADA / PARCIALMENTE JUSTIFICADA / NO JUSTIFICADA / INSUFICIENTE INFORMACIÓN]</p>
+<p style="font-size:0.95em;">[Resumen breve del veredicto]</p>
+</div>
+
+<div style="margin-bottom:1.5em;">
+<p style="font-weight:bold;font-size:1.1em;color:#222;border-bottom:2px solid #e5e7eb;padding-bottom:6px;">📋 ANÁLISIS DE LA INDICACIÓN</p>
+<p>[Análisis del motivo clínico vs prueba solicitada]</p>
+</div>
+
+<div style="margin-bottom:1.5em;">
+<p style="font-weight:bold;font-size:1.1em;color:#222;border-bottom:2px solid #e5e7eb;padding-bottom:6px;">📐 CRITERIOS DE ADECUACIÓN</p>
+<p>[Referencia a guías: ACR Appropriateness Criteria, ESR iGuide, guías nacionales]</p>
+<p>[Puntuación de adecuación si aplica: 1-9]</p>
+</div>
+
+<div style="margin-bottom:1.5em;">
+<p style="font-weight:bold;font-size:1.1em;color:#222;border-bottom:2px solid #e5e7eb;padding-bottom:6px;">⚖️ BALANCE RIESGO-BENEFICIO</p>
+<p>[Dosis estimada si radiación ionizante]</p>
+<p>[Beneficio diagnóstico obtenido vs riesgo]</p>
+</div>
+
+<div style="margin-bottom:1.5em;">
+<p style="font-weight:bold;font-size:1.1em;color:#222;border-bottom:2px solid #e5e7eb;padding-bottom:6px;">🔄 ALTERNATIVAS</p>
+<p>[¿Había alternativas con menor radiación o más adecuadas?]</p>
+</div>
+
+<div style="padding:16px;background:#f0f7ff;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;">
+<p style="font-weight:bold;color:#1e40af;">📝 CONCLUSIÓN</p>
+<p>[Resumen final y recomendación para futuras solicitudes similares]</p>
+</div>
+</div>
+
+## COLORES VEREDICTO
+- Justificada: verde #16a34a, icono ✅
+- Parcialmente justificada: naranja #d97706, icono ⚠️
+- No justificada: rojo #dc2626, icono ❌
+- Insuficiente información: gris #6b7280, icono ❓
+
+## REGLAS
+- Sé objetivo y basado en evidencia
+- Cita guías específicas cuando sea posible (ACR, ESR, SERAM)
+- Considera edad, género, contexto clínico, prioridad
+- Si es urgente/código ictus, valorar la urgencia en la justificación
+- Evalúa si los hallazgos encontrados respaldan la indicación
+- Menciona dosis efectiva aproximada si aplica (mSv)
+
+SOLO HTML. Sin explicaciones adicionales.`;
+
+const DIFF_DIAG_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica. Genera un diagnóstico diferencial exhaustivo para este caso usando un sistema de semáforo de probabilidades. Genera HTML profesional con estilos inline.
+${buildCtxBlock(c)}
+
+## INFORME
+${report}
+${analysis ? "\n## ANÁLISIS PREVIO\n" + analysis : ""}
+
+## FORMATO HTML
+<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
+<p style="font-weight:bold;font-size:1.1em;color:#222;margin-bottom:12px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">🚦 DIAGNÓSTICO DIFERENCIAL</p>
+
+<!-- Para cada diagnóstico, usar el color de semáforo correspondiente -->
+<div style="margin:10px 0;padding:14px 16px;background:rgba(220,38,38,0.06);border-left:5px solid #dc2626;border-radius:0 8px 8px 0;">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#dc2626;"></span>
+<strong style="color:#dc2626;font-size:1.05em;">1. [Diagnóstico más probable] — [%]</strong>
+</div>
+<p style="margin:4px 0;"><strong>A favor:</strong> [argumentos]</p>
+<p style="margin:4px 0;"><strong>En contra:</strong> [argumentos]</p>
+<p style="margin:4px 0;"><strong>Dato clave:</strong> [signo o hallazgo determinante]</p>
+</div>
+
+<div style="margin:10px 0;padding:14px 16px;background:rgba(234,88,12,0.06);border-left:5px solid #ea580c;border-radius:0 8px 8px 0;">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ea580c;"></span>
+<strong style="color:#ea580c;font-size:1.05em;">2. [Diagnóstico algo menos probable] — [%]</strong>
+</div>
+<p>...</p>
+</div>
+
+<div style="margin:10px 0;padding:14px 16px;background:rgba(202,138,4,0.06);border-left:5px solid #ca8a04;border-radius:0 8px 8px 0;">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ca8a04;"></span>
+<strong style="color:#ca8a04;font-size:1.05em;">3. [Diagnóstico menos probable] — [%]</strong>
+</div>
+<p>...</p>
+</div>
+
+<div style="margin:10px 0;padding:14px 16px;background:rgba(22,163,74,0.06);border-left:5px solid #16a34a;border-radius:0 8px 8px 0;">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#16a34a;"></span>
+<strong style="color:#16a34a;font-size:1.05em;">4. [Prácticamente descartado] — [%]</strong>
+</div>
+<p>...</p>
+</div>
+
+<div style="margin-top:1.5em;padding:16px;background:#fafafa;border-radius:8px;border:1px solid #e5e7eb;">
+<p style="font-weight:bold;color:#222;margin-bottom:8px;">🎯 RESUMEN</p>
+<p>[Diagnóstico principal y conducta recomendada]</p>
+</div>
+</div>
+
+## CÓDIGO DE SEMÁFORO (OBLIGATORIO)
+- 🔴 ROJO (#dc2626): Más probable (>50% o diagnóstico principal)
+- 🟠 NARANJA (#ea580c): Algo menos probable (20-50%)
+- 🟡 AMARILLO (#ca8a04): Menos probable aún (5-20%)
+- 🟢 VERDE (#16a34a): Prácticamente descartado (<5%)
+
+## REGLAS
+- Mínimo 4 diagnósticos, máximo 8
+- Cada diagnóstico con: argumentos a favor, en contra, dato clave
+- Las probabilidades deben sumar ~100%
+- Ordenar de mayor a menor probabilidad
+- El color del borde izquierdo y del texto DEBE corresponder al semáforo
+- Incluir diagnósticos "can't miss" aunque sean poco probables
+- Para cada diagnóstico incluir qué prueba confirmaría/descartaría
+
+SOLO HTML. Sin explicaciones adicionales.`;
+
 function LoadingDots({ text }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0" }}>
@@ -220,6 +378,12 @@ export default function Page() {
   const [ldReport, setLdReport] = useState(false);
   const [ldAnalysis, setLdAnalysis] = useState(false);
   const [ldChat, setLdChat] = useState(false);
+  const [keyIdeas, setKeyIdeas] = useState("");
+  const [ldKeyIdeas, setLdKeyIdeas] = useState(false);
+  const [justification, setJustification] = useState("");
+  const [ldJustification, setLdJustification] = useState(false);
+  const [diffDiag, setDiffDiag] = useState("");
+  const [ldDiffDiag, setLdDiffDiag] = useState(false);
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
@@ -303,10 +467,25 @@ export default function Page() {
 }
     catch (e) { setErr("Error chat: " + e.message); } setLdChat(false);
   };
+  const genKeyIdeas = async () => {
+    if (!report || ldKeyIdeas) return; setLdKeyIdeas(true); setErr(""); setRTab("keyIdeas");
+    try { setKeyIdeas(clean(await callAPI(KEY_IDEAS_SYS(ctx, report, analysis), [{ role: "user", content: "Genera las 10 ideas clave de este caso radiológico." }]))); }
+    catch (e) { setErr("Error ideas clave: " + e.message); } setLdKeyIdeas(false);
+  };
+  const genJustification = async () => {
+    if (!report || ldJustification) return; setLdJustification(true); setErr(""); setRTab("justification");
+    try { setJustification(clean(await callAPI(JUSTIFICATION_SYS(ctx, report), [{ role: "user", content: "Analiza la justificación de esta prueba radiológica." }]))); }
+    catch (e) { setErr("Error justificación: " + e.message); } setLdJustification(false);
+  };
+  const genDiffDiag = async () => {
+    if (!report || ldDiffDiag) return; setLdDiffDiag(true); setErr(""); setRTab("diffDiag");
+    try { setDiffDiag(clean(await callAPI(DIFF_DIAG_SYS(ctx, report, analysis), [{ role: "user", content: "Genera el diagnóstico diferencial con código semáforo para este caso." }]))); }
+    catch (e) { setErr("Error diagnóstico diferencial: " + e.message); } setLdDiffDiag(false);
+  };
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
 
@@ -439,6 +618,9 @@ export default function Page() {
             <Tab active={rTab === "report"} icon="📄" label="Informe" badge={!!report && rTab !== "report"} onClick={() => setRTab("report")} P={P} />
             <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" badge={!!analysis && rTab !== "analysis"} onClick={() => setRTab("analysis")} P={P} />
             <Tab active={rTab === "chat"} icon="💬" label="Chat" badge={cMsgs.length > 0 && rTab !== "chat"} onClick={() => setRTab("chat")} P={P} />
+            <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} />
+            <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" badge={!!justification && rTab !== "justification"} onClick={() => setRTab("justification")} P={P} />
+            <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" badge={!!diffDiag && rTab !== "diffDiag"} onClick={() => setRTab("diffDiag")} P={P} />
           </div>
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -464,6 +646,22 @@ export default function Page() {
               <textarea ref={cInpRef} value={cInput} onChange={e => setCInput(e.target.value)} onKeyDown={e => hk(e, sendChat)} onFocus={() => setFf("ch")} onBlur={() => setFf("")} placeholder="¿Recomendar PET-TC? ¿Seguimiento?..." style={{ ...S.ta(ff === "ch"), borderColor: ff === "ch" ? P.chatInputBorderFocus : P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor }} rows={2} disabled={ldChat} />
               <button onClick={sendChat} disabled={ldChat || !cInput.trim()} style={{ ...S.sb(ldChat || !cInput.trim()), background: ldChat || !cInput.trim() ? (isDark ? "#333" : "#ccc") : P.chatSendBg }}>▶</button>
             </div></div>
+          </div>}
+
+          {rTab === "keyIdeas" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            <div style={{ ...S.rh, background: P.keyIdeasHeader, borderColor: P.keyIdeasHeaderBorder }}><span style={{ ...S.rt, color: P.keyIdeasTitleColor }}>Ideas Clave</span>{keyIdeas && <button onClick={genKeyIdeas} disabled={ldKeyIdeas} style={{ ...S.cb("s"), color: P.keyIdeasTitleColor }}>🔄 Regenerar</button>}</div>
+            <div style={{ ...S.rc, background: P.keyIdeasBg }}>{ldKeyIdeas ? <div style={S.ph}><LoadingDots text="Extrayendo ideas clave..." /></div> : keyIdeas ? <div dangerouslySetInnerHTML={{ __html: keyIdeas }} /> : <div style={S.ph}><div style={S.phI}>💡</div><div style={{ ...S.phT, color: P.keyIdeasTitleColor }}>Ideas clave bajo demanda</div><div style={S.phD}>{report ? "Genera un resumen de 10 ideas clave que llevarte de este caso." : "Genera primero un informe."}</div>{report && <button onClick={genKeyIdeas} style={{ ...S.aBtn, background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>💡 Generar Ideas Clave</button>}</div>}</div>
+          </div>}
+
+          {rTab === "justification" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            <div style={{ ...S.rh, background: P.justifHeader, borderColor: P.justifHeaderBorder }}><span style={{ ...S.rt, color: P.justifTitleColor }}>¿Justificada?</span>{justification && <button onClick={genJustification} disabled={ldJustification} style={{ ...S.cb("s"), color: P.justifTitleColor }}>🔄 Regenerar</button>}</div>
+            <div style={{ ...S.rc, background: P.justifBg }}>{ldJustification ? <div style={S.ph}><LoadingDots text="Analizando justificación..." /></div> : justification ? <div dangerouslySetInnerHTML={{ __html: justification }} /> : <div style={S.ph}><div style={S.phI}>❓</div><div style={{ ...S.phT, color: P.justifTitleColor }}>Justificación bajo demanda</div><div style={S.phD}>{report ? "Analiza si esta prueba radiológica estaba clínicamente justificada." : "Genera primero un informe."}</div>{report && <button onClick={genJustification} style={{ ...S.aBtn, background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>❓ Analizar Justificación</button>}</div>}</div>
+          </div>}
+
+          {rTab === "diffDiag" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            <div style={{ ...S.rh, background: P.diffDiagHeader, borderColor: P.diffDiagHeaderBorder }}><span style={{ ...S.rt, color: P.diffDiagTitleColor }}>Diagnóstico Diferencial</span>{diffDiag && <button onClick={genDiffDiag} disabled={ldDiffDiag} style={{ ...S.cb("s"), color: P.diffDiagTitleColor }}>🔄 Regenerar</button>}</div>
+            <div style={{ ...S.rc, background: P.diffDiagBg }}>{ldDiffDiag ? <div style={S.ph}><LoadingDots text="Generando diferencial..." /></div> : diffDiag ? <div dangerouslySetInnerHTML={{ __html: diffDiag }} /> : <div style={S.ph}><div style={S.phI}>🚦</div><div style={{ ...S.phT, color: P.diffDiagTitleColor }}>Diferencial bajo demanda</div><div style={S.phD}>{report ? "Diagnóstico diferencial con código semáforo de probabilidades." : "Genera primero un informe."}</div>{report && <button onClick={genDiffDiag} style={{ ...S.aBtn, background: "linear-gradient(135deg,#ef4444,#dc2626)" }}>🚦 Generar Diferencial</button>}</div>}</div>
+            {diffDiag && <div style={{ ...S.lg, borderColor: P.diffDiagHeaderBorder }}>{[["#dc2626", "Más probable"], ["#ea580c", "Probable"], ["#ca8a04", "Menos probable"], ["#16a34a", "Descartado"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
         </div>
       </div>
