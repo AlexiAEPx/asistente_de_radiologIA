@@ -30,6 +30,7 @@ const palette = (dark) => dark ? {
   keyIdeasBg: "linear-gradient(180deg,#1a1520,#181422)", keyIdeasHeader: "#1c1628", keyIdeasHeaderBorder: "rgba(217,119,6,0.2)", keyIdeasTitleColor: "#fbbf24",
   justifBg: "linear-gradient(180deg,#1a1424,#18122a)", justifHeader: "#1e1630", justifHeaderBorder: "rgba(168,85,247,0.2)", justifTitleColor: "#c084fc",
   diffDiagBg: "linear-gradient(180deg,#141a1e,#121820)", diffDiagHeader: "#161e24", diffDiagHeaderBorder: "rgba(239,68,68,0.2)", diffDiagTitleColor: "#f87171",
+  mindMapBg: "linear-gradient(180deg,#161820,#141622)", mindMapHeader: "#181a26", mindMapHeaderBorder: "rgba(56,189,248,0.2)", mindMapTitleColor: "#38bdf8",
   dropdownBg: "#1a1a2e", dropdownShadow: "0 8px 24px rgba(0,0,0,0.5)",
   errorBg: "rgba(204,0,0,0.1)", errorBorder: "rgba(204,0,0,0.2)", errorText: "#ff6b6b",
   urgentBg: "rgba(220,38,38,0.15)", ictusBg: "rgba(220,38,38,0.25)",
@@ -49,6 +50,7 @@ const palette = (dark) => dark ? {
   keyIdeasBg: "linear-gradient(180deg,#fffbf5,#fef7ed)", keyIdeasHeader: "#fef3e2", keyIdeasHeaderBorder: "#fde68a", keyIdeasTitleColor: "#92400e",
   justifBg: "linear-gradient(180deg,#fdf8ff,#f5f0ff)", justifHeader: "#f3e8ff", justifHeaderBorder: "#d8b4fe", justifTitleColor: "#6b21a8",
   diffDiagBg: "linear-gradient(180deg,#fef9f9,#fdf5f5)", diffDiagHeader: "#fef2f2", diffDiagHeaderBorder: "#fecaca", diffDiagTitleColor: "#991b1b",
+  mindMapBg: "linear-gradient(180deg,#f8fbff,#f0f7ff)", mindMapHeader: "#e8f4ff", mindMapHeaderBorder: "#7dd3fc", mindMapTitleColor: "#0369a1",
   dropdownBg: "#faf8f5", dropdownShadow: "0 8px 24px rgba(0,0,0,0.12)",
   errorBg: "rgba(204,0,0,0.06)", errorBorder: "rgba(204,0,0,0.15)", errorText: "#cc0000",
   urgentBg: "rgba(220,38,38,0.08)", ictusBg: "rgba(220,38,38,0.12)",
@@ -216,7 +218,7 @@ ${report ? "\n## INFORME\n" + report : ""}
 ${analysis ? "\n## ANÁLISIS\n" + analysis : ""}
 Responde directo, profesional. HTML para complejas, texto para breves. Español.`;
 
-const KEY_IDEAS_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica. A partir del informe y análisis del caso, genera exactamente 10 ideas clave que un radiólogo debe llevarse de este caso. Genera HTML profesional con estilos inline.
+const KEY_IDEAS_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica. A partir del informe y análisis del caso, genera exactamente 10 ideas clave que un radiólogo debe llevarse de este caso. Genera HTML profesional con estilos inline. JUEGA CON EL FORMATO: usa negritas, MAYÚSCULAS, subrayados, tamaños variados y colores para que la lectura sea ágil y visualmente atractiva.
 ${buildCtxBlock(c)}
 
 ## INFORME
@@ -224,21 +226,33 @@ ${report}
 ${analysis ? "\n## ANÁLISIS\n" + analysis : ""}
 
 ## FORMATO HTML
-<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
-<p style="font-weight:bold;font-size:1.1em;color:#92400e;margin-bottom:12px;border-bottom:2px solid #fde68a;padding-bottom:8px;">💡 10 IDEAS CLAVE DEL CASO</p>
-<div style="margin-bottom:10px;padding:12px 16px;background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;">
-<p><strong style="color:#b45309;">1.</strong> [Idea clave concisa y práctica]</p>
+<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.8;font-size:14px;color:#333;">
+<p style="font-weight:800;font-size:1.2em;color:#92400e;margin-bottom:14px;border-bottom:3px solid #fde68a;padding-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">💡 10 IDEAS CLAVE DEL CASO</p>
+
+<div style="margin-bottom:12px;padding:14px 18px;background:#fffbeb;border-left:5px solid #dc2626;border-radius:0 10px 10px 0;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+<p style="margin-bottom:4px;"><strong style="color:#dc2626;font-size:1.15em;">1.</strong> <span style="font-weight:800;text-transform:uppercase;color:#991b1b;font-size:0.95em;letter-spacing:0.3px;">[TÍTULO BREVE DE LA IDEA]</span></p>
+<p style="margin:0;font-size:13.5px;color:#444;line-height:1.6;">[Explicación concisa con <strong>términos clave en negrita</strong>, <span style="text-decoration:underline;text-decoration-color:#f59e0b;">datos importantes subrayados</span> y <span style="font-weight:700;color:#b45309;">valores numéricos resaltados</span>]</p>
 </div>
-... (repetir para las 10 ideas)
+
+... (repetir para las 10 ideas, alternando colores de borde según gravedad)
 </div>
+
+## FORMATO DE CADA IDEA (OBLIGATORIO)
+- Línea 1: NÚMERO + TÍTULO EN MAYÚSCULAS Y NEGRITA (resume la idea en 3-6 palabras)
+- Línea 2: Explicación de 1-2 frases con formato variado:
+  · Términos médicos clave en <strong>negrita</strong>
+  · Valores numéricos y medidas con <span style="font-weight:700;color:#b45309;">peso visual</span>
+  · Datos críticos con <span style="text-decoration:underline;">subrayado</span>
+  · Diagnósticos importantes en MAYÚSCULAS
 
 ## REGLAS
 - Exactamente 10 ideas, numeradas
-- Cada idea: 1-2 frases concisas y de alto valor práctico
+- Cada idea: título en MAYÚSCULAS + explicación con formato rico
 - Enfocadas en lo que el radiólogo debe recordar: hallazgos críticos, diagnóstico, seguimiento, errores a evitar, correlaciones clínico-radiológicas
 - Ordenadas de mayor a menor relevancia clínica
 - Incluir si aplica: diagnóstico principal, hallazgos incidentales, recomendaciones de seguimiento, signos radiológicos clave, diagnósticos diferenciales importantes, errores frecuentes a evitar
-- Usar colores en el número: #CC0000 para ideas sobre patología grave, #d97706 para hallazgos moderados, #2E8B57 para normalidad relevante
+- Color del borde izquierdo según gravedad: #dc2626 para patología grave, #f59e0b para hallazgos moderados, #16a34a para normalidad relevante
+- Variar el formato visual entre ideas para evitar monotonía
 
 SOLO HTML. Sin explicaciones adicionales.`;
 
@@ -299,7 +313,7 @@ ${report}
 
 SOLO HTML. Sin explicaciones adicionales.`;
 
-const DIFF_DIAG_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica. Genera un diagnóstico diferencial exhaustivo para este caso usando un sistema de semáforo de probabilidades. Genera HTML profesional con estilos inline.
+const DIFF_DIAG_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica. Genera un diagnóstico diferencial exhaustivo para este caso usando un sistema de semáforo de probabilidades. Genera HTML profesional con estilos inline. JUEGA CON EL FORMATO: usa negritas, MAYÚSCULAS, subrayados, tamaños variados y colores para que la lectura sea ágil, visual y fácil de escanear rápidamente.
 ${buildCtxBlock(c)}
 
 ## INFORME
@@ -307,49 +321,37 @@ ${report}
 ${analysis ? "\n## ANÁLISIS PREVIO\n" + analysis : ""}
 
 ## FORMATO HTML
-<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
-<p style="font-weight:bold;font-size:1.1em;color:#222;margin-bottom:12px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">🚦 DIAGNÓSTICO DIFERENCIAL</p>
+<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.8;font-size:14px;color:#333;">
+<p style="font-weight:800;font-size:1.25em;color:#222;margin-bottom:14px;border-bottom:3px solid #e5e7eb;padding-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">🚦 DIAGNÓSTICO DIFERENCIAL</p>
 
 <!-- Para cada diagnóstico, usar el color de semáforo correspondiente -->
-<div style="margin:10px 0;padding:14px 16px;background:rgba(220,38,38,0.06);border-left:5px solid #dc2626;border-radius:0 8px 8px 0;">
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#dc2626;"></span>
-<strong style="color:#dc2626;font-size:1.05em;">1. [Diagnóstico más probable] — [%]</strong>
+<div style="margin:12px 0;padding:16px 20px;background:rgba(220,38,38,0.06);border-left:6px solid #dc2626;border-radius:0 10px 10px 0;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#dc2626;box-shadow:0 0 6px rgba(220,38,38,0.4);"></span>
+<strong style="color:#dc2626;font-size:1.15em;text-transform:uppercase;letter-spacing:0.3px;">1. [DIAGNÓSTICO MÁS PROBABLE]</strong>
+<span style="background:#dc2626;color:#fff;padding:2px 10px;border-radius:20px;font-size:0.8em;font-weight:700;">[X%]</span>
 </div>
-<p style="margin:4px 0;"><strong>A favor:</strong> [argumentos]</p>
-<p style="margin:4px 0;"><strong>En contra:</strong> [argumentos]</p>
-<p style="margin:4px 0;"><strong>Dato clave:</strong> [signo o hallazgo determinante]</p>
-</div>
-
-<div style="margin:10px 0;padding:14px 16px;background:rgba(234,88,12,0.06);border-left:5px solid #ea580c;border-radius:0 8px 8px 0;">
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ea580c;"></span>
-<strong style="color:#ea580c;font-size:1.05em;">2. [Diagnóstico algo menos probable] — [%]</strong>
-</div>
-<p>...</p>
+<p style="margin:6px 0;font-size:13.5px;"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-weight:800;font-size:12px;text-transform:uppercase;">✅ A FAVOR</span> [argumentos con <strong>términos clave en negrita</strong> y <span style="text-decoration:underline;">hallazgos subrayados</span>]</p>
+<p style="margin:6px 0;font-size:13.5px;"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-weight:800;font-size:12px;text-transform:uppercase;">❌ EN CONTRA</span> [argumentos]</p>
+<p style="margin:6px 0;font-size:13.5px;"><span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:4px;font-weight:800;font-size:12px;text-transform:uppercase;">🔑 DATO CLAVE</span> <span style="text-decoration:underline;text-decoration-color:#6366f1;font-weight:700;">[signo o hallazgo determinante]</span></p>
+<p style="margin:6px 0;font-size:13px;"><span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-weight:800;font-size:11px;text-transform:uppercase;">🔬 CONFIRMAR CON</span> [prueba confirmatoria]</p>
 </div>
 
-<div style="margin:10px 0;padding:14px 16px;background:rgba(202,138,4,0.06);border-left:5px solid #ca8a04;border-radius:0 8px 8px 0;">
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ca8a04;"></span>
-<strong style="color:#ca8a04;font-size:1.05em;">3. [Diagnóstico menos probable] — [%]</strong>
+[Repetir con colores naranja #ea580c, amarillo #ca8a04, verde #16a34a — reduciendo intensidad visual progresivamente]
+
+<div style="margin-top:1.8em;padding:18px 20px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:10px;border:2px solid #e2e8f0;">
+<p style="font-weight:800;color:#1e293b;margin-bottom:8px;font-size:1.1em;text-transform:uppercase;letter-spacing:0.3px;">🎯 RESUMEN Y CONDUCTA</p>
+<p>[Diagnóstico principal en <strong style="font-size:1.05em;text-decoration:underline;">NEGRITA MAYÚSCULA SUBRAYADO</strong> y conducta recomendada con <strong>pasos priorizados</strong>]</p>
 </div>
-<p>...</p>
 </div>
 
-<div style="margin:10px 0;padding:14px 16px;background:rgba(22,163,74,0.06);border-left:5px solid #16a34a;border-radius:0 8px 8px 0;">
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#16a34a;"></span>
-<strong style="color:#16a34a;font-size:1.05em;">4. [Prácticamente descartado] — [%]</strong>
-</div>
-<p>...</p>
-</div>
-
-<div style="margin-top:1.5em;padding:16px;background:#fafafa;border-radius:8px;border:1px solid #e5e7eb;">
-<p style="font-weight:bold;color:#222;margin-bottom:8px;">🎯 RESUMEN</p>
-<p>[Diagnóstico principal y conducta recomendada]</p>
-</div>
-</div>
+## FORMATO DE CADA DIAGNÓSTICO (OBLIGATORIO)
+- Nombre del diagnóstico siempre en MAYÚSCULAS y negrita
+- Porcentaje en badge/pill de color
+- Etiquetas (A FAVOR, EN CONTRA, DATO CLAVE, CONFIRMAR CON) en MAYÚSCULAS como badges
+- Hallazgos relevantes en <strong>negrita</strong> dentro del texto
+- Datos determinantes con <span style="text-decoration:underline;">subrayado</span>
+- Valores numéricos y medidas con peso visual (font-weight:700, color)
 
 ## CÓDIGO DE SEMÁFORO (OBLIGATORIO)
 - 🔴 ROJO (#dc2626): Más probable (>50% o diagnóstico principal)
@@ -359,12 +361,89 @@ ${analysis ? "\n## ANÁLISIS PREVIO\n" + analysis : ""}
 
 ## REGLAS
 - Mínimo 4 diagnósticos, máximo 8
-- Cada diagnóstico con: argumentos a favor, en contra, dato clave
+- Cada diagnóstico con: argumentos a favor, en contra, dato clave, prueba confirmatoria
 - Las probabilidades deben sumar ~100%
 - Ordenar de mayor a menor probabilidad
 - El color del borde izquierdo y del texto DEBE corresponder al semáforo
 - Incluir diagnósticos "can't miss" aunque sean poco probables
-- Para cada diagnóstico incluir qué prueba confirmaría/descartaría
+- Usar formato variado entre diagnósticos para evitar monotonía visual
+
+SOLO HTML. Sin explicaciones adicionales.`;
+
+const MIND_MAP_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica y comunicación visual. A partir del informe y análisis del caso, genera un MAPA MENTAL visual en HTML puro (sin JavaScript, sin SVG, sin canvas) que organice toda la información del caso de forma jerárquica y visualmente clara.
+${buildCtxBlock(c)}
+
+## INFORME
+${report}
+${analysis ? "\n## ANÁLISIS\n" + analysis : ""}
+
+## ESTRUCTURA DEL MAPA MENTAL
+El nodo central es el CASO/PACIENTE. De ahí salen ramas principales:
+
+1. 🏥 DATOS CLÍNICOS — edad, sexo, antecedentes, motivo
+2. 🔬 HALLAZGOS — hallazgos principales y secundarios del informe
+3. 🎯 DIAGNÓSTICO PRINCIPAL — diagnóstico más probable con probabilidad
+4. 🔀 DIFERENCIAL — otros diagnósticos posibles (con probabilidades)
+5. ⚠️ CAN'T MISS — diagnósticos que no se pueden pasar por alto
+6. 📐 ESCALAS — escalas y graduaciones aplicables
+7. 📋 RECOMENDACIONES — seguimiento, pruebas adicionales
+8. 💡 PERLAS — datos clave para recordar
+
+## FORMATO HTML (CSS puro, SIN JavaScript)
+Usa un diseño de árbol/mapa visual con:
+- Un nodo central grande y llamativo (el caso)
+- Ramas que salen radialmente usando flexbox y CSS
+- Cada rama con un color temático diferente
+- Sub-nodos con bordes redondeados y colores de fondo suaves
+- Conectores visuales usando bordes CSS (border-left, border-top)
+- Tipografía variada: MAYÚSCULAS para categorías, negrita para términos clave, subrayado para datos críticos
+- Tamaños de fuente decrecientes según nivel de profundidad
+
+## EJEMPLO DE ESTRUCTURA HTML
+<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;padding:20px;">
+
+<!-- NODO CENTRAL -->
+<div style="text-align:center;margin-bottom:30px;">
+<div style="display:inline-block;padding:16px 28px;background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;border-radius:16px;font-weight:800;font-size:1.2em;text-transform:uppercase;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(59,130,246,0.3);">
+🧠 [TIPO DE ESTUDIO] — [DIAGNÓSTICO PRINCIPAL]
+</div>
+</div>
+
+<!-- GRID DE RAMAS (2 columnas) -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+<!-- RAMA: cada una con su color temático -->
+<div style="padding:14px 16px;border-radius:12px;border-left:5px solid [COLOR];background:[BG_SUAVE];">
+<p style="font-weight:800;font-size:0.9em;text-transform:uppercase;letter-spacing:0.5px;color:[COLOR];margin-bottom:8px;">[ICONO] [CATEGORÍA]</p>
+<div style="padding-left:12px;border-left:2px dashed [COLOR_SUAVE];">
+<p style="margin:4px 0;font-size:13px;">• <strong>[Concepto clave]</strong>: [detalle con <span style="text-decoration:underline;">subrayado</span> en datos importantes]</p>
+<p style="margin:4px 0;font-size:13px;">• [Sub-nodo con <span style="font-weight:700;color:[COLOR];">valores resaltados</span>]</p>
+</div>
+</div>
+
+</div>
+</div>
+
+## COLORES POR RAMA (OBLIGATORIO)
+- Datos clínicos: #6366f1 (índigo)
+- Hallazgos: #0891b2 (cyan)
+- Diagnóstico principal: #dc2626 (rojo)
+- Diferencial: #ea580c (naranja)
+- Can't miss: #b91c1c (rojo oscuro)
+- Escalas: #7c3aed (púrpura)
+- Recomendaciones: #16a34a (verde)
+- Perlas: #d97706 (ámbar)
+
+## REGLAS
+- NO usar JavaScript, SVG ni canvas. Solo HTML + CSS inline
+- Diseño visual tipo mapa mental con nodo central y ramas
+- Usar grid de 2 columnas para las ramas
+- Formato rico: MAYÚSCULAS en categorías, negrita en términos, subrayado en datos críticos
+- Información concisa: cada punto del mapa en 1 línea máximo
+- El diagnóstico principal debe destacar visualmente sobre todo lo demás
+- Incluir probabilidades numéricas en el diferencial
+- Los sub-nodos deben tener indentación visual (padding-left + border-left)
+- Omitir ramas que no apliquen al caso (ej: si no hay escalas, no incluir esa rama)
 
 SOLO HTML. Sin explicaciones adicionales.`;
 
@@ -553,6 +632,8 @@ export default function Page() {
   const [ldJustification, setLdJustification] = useState(false);
   const [diffDiag, setDiffDiag] = useState("");
   const [ldDiffDiag, setLdDiffDiag] = useState(false);
+  const [mindMap, setMindMap] = useState("");
+  const [ldMindMap, setLdMindMap] = useState(false);
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
@@ -651,10 +732,15 @@ export default function Page() {
     try { setDiffDiag(clean(await callAPI(DIFF_DIAG_SYS(ctx, report, analysis), [{ role: "user", content: "Genera el diagnóstico diferencial con código semáforo para este caso." }]))); }
     catch (e) { setErr("Error diagnóstico diferencial: " + e.message); } setLdDiffDiag(false);
   };
+  const genMindMap = async () => {
+    if (!report || ldMindMap) return; setLdMindMap(true); setErr(""); setRTab("mindMap");
+    try { setMindMap(clean(await callAPI(MIND_MAP_SYS(ctx, report, analysis), [{ role: "user", content: "Genera un mapa mental visual completo de este caso radiológico." }]))); }
+    catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
+  };
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
 
@@ -800,6 +886,7 @@ export default function Page() {
             <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} />
             <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" badge={!!justification && rTab !== "justification"} onClick={() => setRTab("justification")} P={P} />
             <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" badge={!!diffDiag && rTab !== "diffDiag"} onClick={() => setRTab("diffDiag")} P={P} />
+            <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} />
           </div>
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -848,6 +935,11 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
             <div style={{ ...S.rh, background: P.diffDiagHeader, borderColor: P.diffDiagHeaderBorder }}><span style={{ ...S.rt, color: P.diffDiagTitleColor }}>Diagnóstico Diferencial</span>{diffDiag && <button onClick={genDiffDiag} disabled={ldDiffDiag} style={{ ...S.cb("s"), color: P.diffDiagTitleColor }}>🔄 Regenerar</button>}</div>
             <div style={{ ...S.rc, background: P.diffDiagBg }}>{ldDiffDiag ? <div style={S.ph}><LoadingDots text="Generando diferencial..." /></div> : diffDiag ? <div dangerouslySetInnerHTML={{ __html: diffDiag }} /> : <div style={S.ph}><div style={S.phI}>🚦</div><div style={{ ...S.phT, color: P.diffDiagTitleColor }}>Diferencial bajo demanda</div><div style={S.phD}>{report ? "Diagnóstico diferencial con código semáforo de probabilidades." : "Genera primero un informe."}</div>{report && <button onClick={genDiffDiag} style={{ ...S.aBtn, background: "linear-gradient(135deg,#ef4444,#dc2626)" }}>🚦 Generar Diferencial</button>}</div>}</div>
             {diffDiag && <div style={{ ...S.lg, borderColor: P.diffDiagHeaderBorder }}>{[["#dc2626", "Más probable"], ["#ea580c", "Probable"], ["#ca8a04", "Menos probable"], ["#16a34a", "Descartado"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
+          </div>}
+
+          {rTab === "mindMap" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            <div style={{ ...S.rh, background: P.mindMapHeader, borderColor: P.mindMapHeaderBorder }}><span style={{ ...S.rt, color: P.mindMapTitleColor }}>Mapa Mental</span>{mindMap && <button onClick={genMindMap} disabled={ldMindMap} style={{ ...S.cb("s"), color: P.mindMapTitleColor }}>🔄 Regenerar</button>}</div>
+            <div style={{ ...S.rc, background: P.mindMapBg }}>{ldMindMap ? <div style={S.ph}><LoadingDots text="Generando mapa mental..." /></div> : mindMap ? <div dangerouslySetInnerHTML={{ __html: mindMap }} /> : <div style={S.ph}><div style={S.phI}>🧠</div><div style={{ ...S.phT, color: P.mindMapTitleColor }}>Mapa mental bajo demanda</div><div style={S.phD}>{report ? "Genera un mapa mental visual que organiza toda la información del caso de forma jerárquica." : "Genera primero un informe."}</div>{report && <button onClick={genMindMap} style={{ ...S.aBtn, background: "linear-gradient(135deg,#0ea5e9,#0284c7)" }}>🧠 Generar Mapa Mental</button>}</div>}</div>
           </div>}
         </div>
       </div>
