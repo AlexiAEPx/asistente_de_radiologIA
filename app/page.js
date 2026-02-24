@@ -87,8 +87,19 @@ ${buildCtxBlock(c)}
 ## COLORES (OBLIGATORIO en cada fragmento)
 - Patológico importante: <span style="color:#CC0000;font-style:italic;font-weight:bold;">texto</span>
 - Patológico leve: <span style="color:#D2691E;font-style:italic;">texto</span>
-- Normal relevante: <span style="color:#2E8B57;">texto</span>
-- Normal relleno: <span style="color:${isDark ? '#aaa' : '#444'};">texto</span>
+- Normal VINCULADO a la patología del paciente: <span style="color:#2E8B57;">texto</span>
+- Normal relleno (no vinculado): <span style="color:${isDark ? '#aaa' : '#444'};">texto</span>
+
+## CRITERIO VERDE vs NEGRO (IMPORTANTE)
+El verde (#2E8B57) es SOLO para hallazgos normales cuya normalidad sea CLÍNICAMENTE SIGNIFICATIVA para la patología o motivo de estudio concreto de este paciente. Si un hallazgo normal no tiene relevancia especial para la patología en estudio, va en color de relleno (negro/gris).
+Ejemplos:
+- Estudio por ISQUEMIA MESENTÉRICA: "sin adenopatías" → NEGRO (relleno, las adenopatías no son relevantes para isquemia mesentérica)
+- Estudio por CÁNCER COLORRECTAL: "sin adenopatías" → VERDE (la ausencia de afectación ganglionar es clave para estadiaje)
+- Estudio por CÁNCER DE PULMÓN: "sin derrame pleural" → VERDE (el derrame es complicación frecuente y relevante)
+- Estudio por LUMBALGIA MECÁNICA: "sin derrame pleural" → NEGRO (no tiene relación con la patología)
+- Estudio por TEP: "sin cardiomegalia, sin derrame pericárdico" → VERDE (repercusión hemodinámica del TEP)
+- Estudio por LITIASIS RENAL: "sin cardiomegalia" → NEGRO (irrelevante para litiasis)
+Piensa SIEMPRE: ¿este hallazgo normal es relevante para el diagnóstico, estadiaje, pronóstico o manejo de la patología concreta de este paciente? Si SÍ → verde. Si NO → negro/relleno.
 
 ## HTML
 <div style="font-family:'Plus Jakarta Sans','Segoe UI',Calibri,sans-serif;line-height:1.7;font-size:14px;">
@@ -812,7 +823,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
 .rpt-content p[style*="color:#444"]{color:${P.text2}!important}
 .rpt-content span[style*="color:#444"]{color:#aaa!important}` : ''}
 `}</style>{report ? <div dangerouslySetInnerHTML={{ __html: report }} /> : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
-            {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal rel."], [isDark ? "#aaa" : "#444", "Normal"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
+            {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal vinculado"], [isDark ? "#aaa" : "#444", "Relleno"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
 
           {rTab === "analysis" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
