@@ -667,6 +667,7 @@ export default function Page() {
   const [expandedCodes, setExpandedCodes] = useState({});
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
   const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -962,6 +963,60 @@ export default function Page() {
               <div key={m.id} style={S.mOpt(m.id === model)} onClick={() => { setModel(m.id); setShowMP(false); }}><span>{m.cost} {m.label}</span><span style={{ fontSize: 11, opacity: 0.6 }}>{m.desc}</span></div>
             ))}</div>}
           </div>
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setShowHistory(!showHistory)} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
+              <span>Historial</span>
+              {history.length > 0 && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, borderRadius: 9, background: P.gold, color: isDark ? "#111" : "#fff", fontSize: 10, fontWeight: 700, padding: "0 4px" }}>{history.length}</span>}
+            </button>
+            {showHistory && <>
+              <div onClick={() => setShowHistory(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 370, maxHeight: "70vh", background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 12, boxShadow: P.dropdownShadow, zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid " + P.historyHeaderBorder, background: P.historyHeader }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: P.historyTitleColor }}>Historial de casos</span>
+                  {history.length > 0 && <button onClick={clearHistory} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid " + P.historyClearBorder, background: P.historyClearBg, color: P.historyDeleteHover, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Borrar todo</button>}
+                </div>
+                <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
+                  {history.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "30px 10px", color: P.historyEmpty }}>
+                      <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: P.historyTitleColor, marginBottom: 4 }}>Sin historial</div>
+                      <div style={{ fontSize: 12, lineHeight: 1.5 }}>Los casos que informes se guardarán aquí automáticamente.</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ fontSize: 11, color: P.historyEmpty, marginBottom: 2 }}>{history.length} {history.length === 1 ? "caso guardado" : "casos guardados"}</div>
+                      {history.map(entry => (
+                        <div key={entry.id} style={{
+                          padding: "10px 12px", borderRadius: 8,
+                          background: P.historyCardBg, border: "1px solid " + P.historyCardBorder,
+                          transition: "background 0.2s",
+                        }}
+                          onMouseEnter={e => e.currentTarget.style.background = P.historyCardHover}
+                          onMouseLeave={e => e.currentTarget.style.background = P.historyCardBg}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 5 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: P.historyDate }}>{entry.date}</span>
+                              <span style={{ fontSize: 10, color: P.historyEmpty }}>{entry.time}</span>
+                            </div>
+                            <button onClick={() => deleteHistoryEntry(entry.id)} title="Eliminar" style={{
+                              background: "none", border: "none", cursor: "pointer", color: P.historyDeleteBtn,
+                              fontSize: 13, padding: "1px 3px", lineHeight: 1, transition: "color 0.2s",
+                            }}
+                              onMouseEnter={e => e.currentTarget.style.color = P.historyDeleteHover}
+                              onMouseLeave={e => e.currentTarget.style.color = P.historyDeleteBtn}
+                            >✕</button>
+                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: P.historyStudy, marginBottom: 4 }}>{entry.study}</div>
+                          <div style={{ fontSize: 11, color: P.historySummary, lineHeight: 1.4 }}>{entry.summary}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>}
+          </div>
           <button onClick={clearAll} style={S.clr}>Nueva sesión</button>
         </div>
       </div>
@@ -1069,7 +1124,6 @@ export default function Page() {
             <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" badge={!!justification && rTab !== "justification"} onClick={() => setRTab("justification")} P={P} />
             <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" badge={!!diffDiag && rTab !== "diffDiag"} onClick={() => setRTab("diffDiag")} P={P} />
             <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} />
-            <Tab active={rTab === "history"} icon="📚" label="Historial" badge={history.length > 0 && rTab !== "history"} onClick={() => setRTab("history")} P={P} />
           </div>
 
           {rTab === "codes" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -1146,51 +1200,6 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
             <div style={{ ...S.rc, background: P.mindMapBg }}>{ldMindMap ? <div style={S.ph}><LoadingDots text="Generando mapa mental..." /></div> : mindMap ? <div dangerouslySetInnerHTML={{ __html: mindMap }} /> : <div style={S.ph}><div style={S.phI}>🧠</div><div style={{ ...S.phT, color: P.mindMapTitleColor }}>Mapa mental bajo demanda</div><div style={S.phD}>{report ? "Genera un mapa mental visual que organiza toda la información del caso de forma jerárquica." : "Genera primero un informe."}</div>{report && <button onClick={genMindMap} style={{ ...S.aBtn, background: "linear-gradient(135deg,#0ea5e9,#0284c7)" }}>🧠 Generar Mapa Mental</button>}</div>}</div>
           </div>}
 
-          {rTab === "history" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.historyHeader, borderColor: P.historyHeaderBorder }}>
-              <span style={{ ...S.rt, color: P.historyTitleColor }}>Historial de casos</span>
-              {history.length > 0 && <button onClick={clearHistory} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid " + P.historyClearBorder, background: P.historyClearBg, color: P.historyDeleteHover, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>🗑 Borrar todo</button>}
-            </div>
-            <div style={{ ...S.rc, background: P.historyBg }}>
-              {history.length === 0 ? (
-                <div style={S.ph}>
-                  <div style={S.phI}>📚</div>
-                  <div style={{ ...S.phT, color: P.historyTitleColor }}>Sin historial</div>
-                  <div style={S.phD}>Los casos que informes se guardarán aquí automáticamente. No consume tokens.</div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ fontSize: 12, color: P.historyEmpty, marginBottom: 4 }}>{history.length} {history.length === 1 ? "caso guardado" : "casos guardados"}</div>
-                  {history.map(entry => (
-                    <div key={entry.id} style={{
-                      padding: "12px 14px", borderRadius: 10,
-                      background: P.historyCardBg, border: "1px solid " + P.historyCardBorder,
-                      transition: "background 0.2s",
-                    }}
-                      onMouseEnter={e => e.currentTarget.style.background = P.historyCardHover}
-                      onMouseLeave={e => e.currentTarget.style.background = P.historyCardBg}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: P.historyDate }}>{entry.date}</span>
-                          <span style={{ fontSize: 11, color: P.historyEmpty }}>{entry.time}</span>
-                        </div>
-                        <button onClick={() => deleteHistoryEntry(entry.id)} title="Eliminar" style={{
-                          background: "none", border: "none", cursor: "pointer", color: P.historyDeleteBtn,
-                          fontSize: 14, padding: "2px 4px", lineHeight: 1, transition: "color 0.2s",
-                        }}
-                          onMouseEnter={e => e.currentTarget.style.color = P.historyDeleteHover}
-                          onMouseLeave={e => e.currentTarget.style.color = P.historyDeleteBtn}
-                        >✕</button>
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: P.historyStudy, marginBottom: 5 }}>{entry.study}</div>
-                      <div style={{ fontSize: 12, color: P.historySummary, lineHeight: 1.5 }}>{entry.summary}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>}
         </div>
       </div>
     </div>
