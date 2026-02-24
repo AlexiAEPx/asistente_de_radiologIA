@@ -56,6 +56,14 @@ const palette = (dark) => dark ? {
 
 const CORRECTIONS = `"sin defectos de reflexión"→"sin defectos de repleción"|"angiotomografía"→"AngioTC"|"quiste de tallo"→"quiste de Tarlov"|"protusiones discotróficas"→"protusiones disco-osteofitarias"|"lobo"→"lóbulo"|"baso"/"vaso"(abdominal)→"bazo"|"células mastoideas"→"celdillas mastoideas"|"L2-S1"→"L5-S1"|"ángulo de Kopp"→"ángulo de Cobb"|"ECografía"→"ecografía"|"edema opaco"→"enema opaco"|"TAG"→"TAC"|"perifysural"→"perifisural"|"alopatia"→"adenopatía"|"Dickson"→"DIXON"|"vaso accesorio"→"bazo accesorio"|"FLIR"→"FLAIR"|"eco-degradiente"→"eco de gradiente"|"reflexión"(digestivo)→"repleción"|"Mattera"→"masetero"`;
 
+const joinEntries = (arr) => {
+  if (!Array.isArray(arr)) return arr || "";
+  const items = arr.filter(e => e.text && e.text.trim());
+  if (!items.length) return "";
+  if (items.length === 1) return items[0].text.trim();
+  return items.map((e, i) => `[${i + 1}] ${e.text.trim()}`).join("\n\n");
+};
+
 const buildCtxBlock = (c) => {
   const p = [];
   if (c.freeText) p.push("Información clínica general (sin clasificar):\n" + c.freeText);
@@ -64,9 +72,12 @@ const buildCtxBlock = (c) => {
   if (c.studyRequested) p.push("Estudio solicitado: " + c.studyRequested);
   if (c.priority && c.priority !== "programado") p.push("Prioridad: " + c.priority.toUpperCase());
   if (c.reason) p.push("Motivo: " + c.reason);
-  if (c.clinicalHistory) p.push("Antecedentes:\n" + c.clinicalHistory);
-  if (c.priorRadiology) p.push("Informes radiológicos previos:\n" + c.priorRadiology);
-  if (c.clinicalReports) p.push("Informes clínicos:\n" + c.clinicalReports);
+  const ch = joinEntries(c.clinicalHistory);
+  if (ch) p.push("Antecedentes:\n" + ch);
+  const pr = joinEntries(c.priorRadiology);
+  if (pr) p.push("Informes radiológicos previos:\n" + pr);
+  const cr = joinEntries(c.clinicalReports);
+  if (cr) p.push("Informes clínicos:\n" + cr);
   return p.length ? "\n\n## CONTEXTO CLÍNICO\n" + p.join("\n\n") : "";
 };
 
@@ -399,8 +410,114 @@ function ThemeToggle({ themePref, setThemePref, P }) {
   );
 }
 
+function MultiEntryGroup({ entries, onChange, label, singularLabel, placeholder, P, ff, setFf, fieldKey, bigH }) {
+  const updateText = (idx, text) => {
+    onChange(entries.map((e, i) => i === idx ? { ...e, text } : e));
+  };
+  const toggleCollapse = (idx) => {
+    onChange(entries.map((e, i) => i === idx ? { ...e, collapsed: !e.collapsed } : e));
+  };
+  const removeEntry = (idx) => {
+    if (entries.length <= 1) { onChange([{ text: "", collapsed: false }]); return; }
+    onChange(entries.filter((_, i) => i !== idx));
+  };
+  const addEntry = () => {
+    onChange([...entries.map(e => e.text.trim() ? { ...e, collapsed: true } : e), { text: "", collapsed: false }]);
+  };
+
+  const hasMultiple = entries.length > 1 || entries[0].text.trim();
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: P.text3, marginBottom: 6, letterSpacing: 0.3, textTransform: "uppercase" }}>
+        {label}
+      </label>
+      {entries.map((entry, idx) => {
+        const itemKey = `${fieldKey}_${idx}`;
+        const focused = ff === itemKey;
+        const num = entries.length > 1 ? ` ${idx + 1}` : "";
+
+        if (entry.collapsed && entry.text.trim()) {
+          return (
+            <div key={idx} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", marginBottom: 5,
+              borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg,
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: P.gold, whiteSpace: "nowrap" }}>
+                {singularLabel}{num}
+              </span>
+              <span style={{ flex: 1, fontSize: 12, color: P.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {entry.text.trim().substring(0, 80)}{entry.text.trim().length > 80 ? "…" : ""}
+              </span>
+              <button onClick={() => toggleCollapse(idx)} title="Editar" style={{
+                background: "none", border: "none", cursor: "pointer", color: P.gold,
+                fontSize: 13, padding: "2px 5px", lineHeight: 1,
+              }}>✏️</button>
+              <button onClick={() => removeEntry(idx)} title="Eliminar" style={{
+                background: "none", border: "none", cursor: "pointer", color: P.errorText,
+                fontSize: 13, fontWeight: 700, padding: "2px 5px", lineHeight: 1,
+              }}>✕</button>
+            </div>
+          );
+        }
+
+        return (
+          <div key={idx} style={{ marginBottom: 5 }}>
+            {hasMultiple && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 11, color: P.text3, fontWeight: 500 }}>{singularLabel}{num}</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {entry.text.trim() && (
+                    <button onClick={() => toggleCollapse(idx)} style={{
+                      background: "none", border: "none", cursor: "pointer", color: P.gold,
+                      fontSize: 11, fontFamily: "inherit", padding: "1px 4px",
+                    }}>▲ Guardar</button>
+                  )}
+                  {entries.length > 1 && (
+                    <button onClick={() => removeEntry(idx)} style={{
+                      background: "none", border: "none", cursor: "pointer", color: P.errorText,
+                      fontSize: 11, fontFamily: "inherit", padding: "1px 4px", fontWeight: 700,
+                    }}>✕</button>
+                  )}
+                </div>
+              </div>
+            )}
+            <textarea
+              placeholder={placeholder}
+              value={entry.text}
+              onChange={e => updateText(idx, e.target.value)}
+              onFocus={() => setFf(itemKey)}
+              onBlur={() => setFf("")}
+              style={{
+                width: "100%", padding: "7px 10px", borderRadius: 7,
+                border: "1px solid " + (focused ? P.goldBorderFocus : P.inputBorder),
+                background: focused ? P.inputBgFocus : P.inputBg,
+                color: P.text, fontSize: 13, fontFamily: "inherit", outline: "none",
+                resize: "vertical", minHeight: focused ? (bigH || 180) : 56, lineHeight: 1.5,
+                boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s, background 0.2s",
+              }}
+            />
+          </div>
+        );
+      })}
+      <button onClick={addEntry} style={{
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+        width: "100%", marginTop: 2, padding: "5px 10px", borderRadius: 7,
+        border: "1px dashed " + P.goldBorder, background: "transparent",
+        color: P.gold, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+        opacity: 0.7, transition: "opacity 0.2s",
+      }}
+        onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+        onMouseLeave={e => e.currentTarget.style.opacity = "0.7"}
+      >
+        + Añadir {singularLabel.toLowerCase()}
+      </button>
+    </div>
+  );
+}
+
 export default function Page() {
-  const emptyCtx = { age: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: "", priorRadiology: "", clinicalReports: "", freeText: "" };
+  const emptyCtx = { age: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: [{ text: "", collapsed: false }], priorRadiology: [{ text: "", collapsed: false }], clinicalReports: [{ text: "", collapsed: false }], freeText: "" };
 
   const [themePref, setThemePref] = useState("auto");
   const [systemDark, setSystemDark] = useState(false);
@@ -654,9 +771,9 @@ export default function Page() {
                   {[["programado", "Programado"], ["urgente", "🔴 Urgente"], ["codigo_ictus", "🚨 Código Ictus"]].map(([v, l]) => (<button key={v} onClick={() => setCtx({ ...ctx, priority: v })} style={S.chip(v, ctx.priority)}>{l}</button>))}
                 </div></div>
               <div style={S.fg}><label style={S.lb}>Motivo de petición</label><input type="text" placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={S.inp(ff === "re")} /></div>
-              <div style={S.fg}><label style={S.lb}>Antecedentes clínicos</label><textarea placeholder="Patologías, cirugías, tratamientos..." value={ctx.clinicalHistory} onChange={e => setCtx({ ...ctx, clinicalHistory: e.target.value })} onFocus={() => setFf("hi")} onBlur={() => setFf("")} style={S.taf(ff === "hi")} /></div>
-              <div style={S.fg}><label style={S.lb}>Informes radiológicos previos</label><textarea placeholder="Pegar informes anteriores..." value={ctx.priorRadiology} onChange={e => setCtx({ ...ctx, priorRadiology: e.target.value })} onFocus={() => setFf("ra")} onBlur={() => setFf("")} style={S.taf(ff === "ra", 220)} /></div>
-              <div style={S.fg}><label style={S.lb}>Informes clínicos</label><textarea placeholder="Altas, consultas, analíticas..." value={ctx.clinicalReports} onChange={e => setCtx({ ...ctx, clinicalReports: e.target.value })} onFocus={() => setFf("cl")} onBlur={() => setFf("")} style={S.taf(ff === "cl", 220)} /></div>
+              <MultiEntryGroup entries={ctx.clinicalHistory} onChange={v => setCtx({ ...ctx, clinicalHistory: v })} label="Antecedentes clínicos" singularLabel="Antecedente" placeholder="Patologías, cirugías, tratamientos..." P={P} ff={ff} setFf={setFf} fieldKey="hi" />
+              <MultiEntryGroup entries={ctx.priorRadiology} onChange={v => setCtx({ ...ctx, priorRadiology: v })} label="Informes radiológicos previos" singularLabel="Informe radiológico" placeholder="Pegar informe anterior..." P={P} ff={ff} setFf={setFf} fieldKey="ra" bigH={220} />
+              <MultiEntryGroup entries={ctx.clinicalReports} onChange={v => setCtx({ ...ctx, clinicalReports: v })} label="Informes clínicos" singularLabel="Informe clínico" placeholder="Altas, consultas, analíticas..." P={P} ff={ff} setFf={setFf} fieldKey="cl" bigH={220} />
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
