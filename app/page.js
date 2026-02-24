@@ -30,6 +30,10 @@ const palette = (dark) => dark ? {
   keyIdeasBg: "linear-gradient(180deg,#1a1520,#181422)", keyIdeasHeader: "#1c1628", keyIdeasHeaderBorder: "rgba(217,119,6,0.2)", keyIdeasTitleColor: "#fbbf24",
   justifBg: "linear-gradient(180deg,#1a1424,#18122a)", justifHeader: "#1e1630", justifHeaderBorder: "rgba(168,85,247,0.2)", justifTitleColor: "#c084fc",
   diffDiagBg: "linear-gradient(180deg,#141a1e,#121820)", diffDiagHeader: "#161e24", diffDiagHeaderBorder: "rgba(239,68,68,0.2)", diffDiagTitleColor: "#f87171",
+  historyBg: "linear-gradient(180deg,#161620,#141418)", historyHeader: "#1a1a24", historyHeaderBorder: "rgba(196,151,60,0.2)", historyTitleColor: "#c4973c",
+  historyCardBg: "rgba(255,255,255,0.04)", historyCardBorder: "rgba(196,151,60,0.15)", historyCardHover: "rgba(196,151,60,0.08)",
+  historyDate: "#c4973c", historyStudy: "#e0ddd5", historySummary: "#aaa", historyEmpty: "#555",
+  historyDeleteBtn: "rgba(239,68,68,0.7)", historyDeleteHover: "#ef4444", historyClearBg: "rgba(239,68,68,0.1)", historyClearBorder: "rgba(239,68,68,0.2)",
   dropdownBg: "#1a1a2e", dropdownShadow: "0 8px 24px rgba(0,0,0,0.5)",
   errorBg: "rgba(204,0,0,0.1)", errorBorder: "rgba(204,0,0,0.2)", errorText: "#ff6b6b",
   urgentBg: "rgba(220,38,38,0.15)", ictusBg: "rgba(220,38,38,0.25)",
@@ -49,6 +53,10 @@ const palette = (dark) => dark ? {
   keyIdeasBg: "linear-gradient(180deg,#fffbf5,#fef7ed)", keyIdeasHeader: "#fef3e2", keyIdeasHeaderBorder: "#fde68a", keyIdeasTitleColor: "#92400e",
   justifBg: "linear-gradient(180deg,#fdf8ff,#f5f0ff)", justifHeader: "#f3e8ff", justifHeaderBorder: "#d8b4fe", justifTitleColor: "#6b21a8",
   diffDiagBg: "linear-gradient(180deg,#fef9f9,#fdf5f5)", diffDiagHeader: "#fef2f2", diffDiagHeaderBorder: "#fecaca", diffDiagTitleColor: "#991b1b",
+  historyBg: "linear-gradient(180deg,#fdfbf7,#f9f6f0)", historyHeader: "#f5f1ea", historyHeaderBorder: "rgba(150,114,42,0.2)", historyTitleColor: "#7a6840",
+  historyCardBg: "#fff", historyCardBorder: "rgba(150,114,42,0.15)", historyCardHover: "rgba(150,114,42,0.06)",
+  historyDate: "#96722a", historyStudy: "#1a1a1a", historySummary: "#555", historyEmpty: "#aaa",
+  historyDeleteBtn: "rgba(239,68,68,0.6)", historyDeleteHover: "#dc2626", historyClearBg: "rgba(239,68,68,0.06)", historyClearBorder: "rgba(239,68,68,0.15)",
   dropdownBg: "#faf8f5", dropdownShadow: "0 8px 24px rgba(0,0,0,0.12)",
   errorBg: "rgba(204,0,0,0.06)", errorBorder: "rgba(204,0,0,0.15)", errorText: "#cc0000",
   urgentBg: "rgba(220,38,38,0.08)", ictusBg: "rgba(220,38,38,0.12)",
@@ -558,6 +566,63 @@ export default function Page() {
   const [showMP, setShowMP] = useState(false);
   const [ff, setFf] = useState("");
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
+  const [history, setHistory] = useState([]);
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("radiology_history");
+      if (saved) setHistory(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  // Persist history to localStorage whenever it changes
+  useEffect(() => {
+    try { localStorage.setItem("radiology_history", JSON.stringify(history)); } catch {}
+  }, [history]);
+
+  // Extract a plain-text summary from the report HTML conclusion
+  const extractSummary = (html) => {
+    try {
+      const d = document.createElement("div");
+      d.innerHTML = html;
+      const fullText = d.innerText || d.textContent || "";
+      // Try to find the CONCLUSIÓN section
+      const idx = fullText.indexOf("CONCLUSIÓN");
+      if (idx !== -1) {
+        const after = fullText.substring(idx + "CONCLUSIÓN".length).replace(/^[:\s]+/, "");
+        // Get up to RECOMENDACIÓN or end, and cap at 200 chars
+        const endIdx = after.indexOf("RECOMENDACIÓN");
+        const conclusion = (endIdx !== -1 ? after.substring(0, endIdx) : after).trim();
+        if (conclusion.length > 0) return conclusion.length > 200 ? conclusion.substring(0, 200) + "…" : conclusion;
+      }
+      // Fallback: first 200 chars of full text
+      const clean = fullText.trim();
+      return clean.length > 200 ? clean.substring(0, 200) + "…" : clean;
+    } catch {
+      return "Sin resumen disponible";
+    }
+  };
+
+  const saveToHistory = (reportHtml, caseCtx) => {
+    const now = new Date();
+    const entry = {
+      id: Date.now(),
+      date: now.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      time: now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }),
+      study: caseCtx.studyRequested || "Estudio no especificado",
+      summary: extractSummary(reportHtml),
+    };
+    setHistory(prev => [entry, ...prev]);
+  };
+
+  const deleteHistoryEntry = (id) => {
+    setHistory(prev => prev.filter(e => e.id !== id));
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+  };
 
   const fEndRef = useRef(null);
   const cEndRef = useRef(null);
@@ -613,7 +678,7 @@ export default function Page() {
     const t = fInput.trim(); if (!t || ldReport) return;
     setErr(""); const um = { role: "user", content: t }; const nm = [...fMsgs, um];
     setFMsgs(nm); setFInput(""); setLdReport(true); setRTab("report");
-    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), nm)); setFMsgs(p => [...p, { role: "assistant", content: h }]); setReport(h); setCtxSnap(JSON.stringify(ctx)); }
+    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), nm)); setFMsgs(p => [...p, { role: "assistant", content: h }]); setReport(h); setCtxSnap(JSON.stringify(ctx)); saveToHistory(h, ctx); }
     catch (e) { setErr("Error informe: " + e.message); } setLdReport(false);
   };
   const regenReport = async () => {
@@ -800,6 +865,7 @@ export default function Page() {
             <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} />
             <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" badge={!!justification && rTab !== "justification"} onClick={() => setRTab("justification")} P={P} />
             <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" badge={!!diffDiag && rTab !== "diffDiag"} onClick={() => setRTab("diffDiag")} P={P} />
+            <Tab active={rTab === "history"} icon="📚" label="Historial" badge={history.length > 0 && rTab !== "history"} onClick={() => setRTab("history")} P={P} />
           </div>
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -848,6 +914,52 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
             <div style={{ ...S.rh, background: P.diffDiagHeader, borderColor: P.diffDiagHeaderBorder }}><span style={{ ...S.rt, color: P.diffDiagTitleColor }}>Diagnóstico Diferencial</span>{diffDiag && <button onClick={genDiffDiag} disabled={ldDiffDiag} style={{ ...S.cb("s"), color: P.diffDiagTitleColor }}>🔄 Regenerar</button>}</div>
             <div style={{ ...S.rc, background: P.diffDiagBg }}>{ldDiffDiag ? <div style={S.ph}><LoadingDots text="Generando diferencial..." /></div> : diffDiag ? <div dangerouslySetInnerHTML={{ __html: diffDiag }} /> : <div style={S.ph}><div style={S.phI}>🚦</div><div style={{ ...S.phT, color: P.diffDiagTitleColor }}>Diferencial bajo demanda</div><div style={S.phD}>{report ? "Diagnóstico diferencial con código semáforo de probabilidades." : "Genera primero un informe."}</div>{report && <button onClick={genDiffDiag} style={{ ...S.aBtn, background: "linear-gradient(135deg,#ef4444,#dc2626)" }}>🚦 Generar Diferencial</button>}</div>}</div>
             {diffDiag && <div style={{ ...S.lg, borderColor: P.diffDiagHeaderBorder }}>{[["#dc2626", "Más probable"], ["#ea580c", "Probable"], ["#ca8a04", "Menos probable"], ["#16a34a", "Descartado"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
+          </div>}
+
+          {rTab === "history" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            <div style={{ ...S.rh, background: P.historyHeader, borderColor: P.historyHeaderBorder }}>
+              <span style={{ ...S.rt, color: P.historyTitleColor }}>Historial de casos</span>
+              {history.length > 0 && <button onClick={clearHistory} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid " + P.historyClearBorder, background: P.historyClearBg, color: P.historyDeleteHover, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>🗑 Borrar todo</button>}
+            </div>
+            <div style={{ ...S.rc, background: P.historyBg }}>
+              {history.length === 0 ? (
+                <div style={S.ph}>
+                  <div style={S.phI}>📚</div>
+                  <div style={{ ...S.phT, color: P.historyTitleColor }}>Sin historial</div>
+                  <div style={S.phD}>Los casos que informes se guardarán aquí automáticamente. No consume tokens.</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ fontSize: 12, color: P.historyEmpty, marginBottom: 4 }}>{history.length} {history.length === 1 ? "caso guardado" : "casos guardados"}</div>
+                  {history.map(entry => (
+                    <div key={entry.id} style={{
+                      padding: "12px 14px", borderRadius: 10,
+                      background: P.historyCardBg, border: "1px solid " + P.historyCardBorder,
+                      transition: "background 0.2s",
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = P.historyCardHover}
+                      onMouseLeave={e => e.currentTarget.style.background = P.historyCardBg}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: P.historyDate }}>{entry.date}</span>
+                          <span style={{ fontSize: 11, color: P.historyEmpty }}>{entry.time}</span>
+                        </div>
+                        <button onClick={() => deleteHistoryEntry(entry.id)} title="Eliminar" style={{
+                          background: "none", border: "none", cursor: "pointer", color: P.historyDeleteBtn,
+                          fontSize: 14, padding: "2px 4px", lineHeight: 1, transition: "color 0.2s",
+                        }}
+                          onMouseEnter={e => e.currentTarget.style.color = P.historyDeleteHover}
+                          onMouseLeave={e => e.currentTarget.style.color = P.historyDeleteBtn}
+                        >✕</button>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: P.historyStudy, marginBottom: 5 }}>{entry.study}</div>
+                      <div style={{ fontSize: 12, color: P.historySummary, lineHeight: 1.5 }}>{entry.summary}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>}
         </div>
       </div>
