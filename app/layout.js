@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Asistente de Radiología",
-  description: "Estación de informes radiológicos con IA",
+  title: "asistente_de_radiologIA",
+  description: "Estación de trabajo radiológico con IA — by Alexis Espinosa",
 };
 
 export default function RootLayout({ children }) {

@@ -7,6 +7,13 @@ const MODELS = [
   { id: "claude-opus-4-6", label: "Opus", cost: "💰💰💰", desc: "Máxima calidad" },
 ];
 
+// Pricing per million tokens (USD) — https://docs.anthropic.com/en/docs/about-claude/pricing
+const PRICING = {
+  "claude-haiku-4-5-20251001":  { input: 0.80, output: 4.00 },
+  "claude-sonnet-4-20250514":   { input: 3.00, output: 15.00 },
+  "claude-opus-4-6":            { input: 15.00, output: 75.00 },
+};
+
 const palette = (dark) => dark ? {
   bg: "#0e0e18", bg2: "#111120", bg3: "#1a1a2e",
   text: "#e0ddd5", text2: "#aaa", text3: "#777", text4: "#555",
@@ -24,10 +31,10 @@ const palette = (dark) => dark ? {
   errorBg: "rgba(204,0,0,0.1)", errorBorder: "rgba(204,0,0,0.2)", errorText: "#ff6b6b",
   urgentBg: "rgba(220,38,38,0.15)", ictusBg: "rgba(220,38,38,0.25)",
 } : {
-  bg: "#f5f3ef", bg2: "#ffffff", bg3: "#fafaf8",
+  bg: "#f5f3ef", bg2: "#faf8f5", bg3: "#fafaf8",
   text: "#1a1a1a", text2: "#555", text3: "#888", text4: "#aaa",
   gold: "#96722a", goldDim: "rgba(150,114,42,0.5)", goldBorder: "rgba(150,114,42,0.2)", goldBg: "rgba(150,114,42,0.06)", goldBgActive: "rgba(150,114,42,0.12)", goldBorderFocus: "rgba(150,114,42,0.45)",
-  inputBg: "#ffffff", inputBgFocus: "#fffdf8", inputBorder: "rgba(150,114,42,0.25)",
+  inputBg: "#f7f5f0", inputBgFocus: "#faf7f0", inputBorder: "rgba(150,114,42,0.25)",
   bubbleUser: "linear-gradient(135deg,#96722a,#7a5c1f)", bubbleAsst: "#f0ece4", bubbleAsstBorder: "#e0dbd0",
   reportBg: "linear-gradient(180deg,#fdfbf7,#f9f6f0)", reportHeader: "#f5f1ea", reportHeaderBorder: "#e8e4dc", reportTitleColor: "#8a7a60",
   legendBg: "#f5f1ea", legendBorder: "#e8e4dc",
@@ -36,7 +43,7 @@ const palette = (dark) => dark ? {
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.06)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#555",
   chatInputBg: "rgba(255,255,255,0.8)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#333",
   chatInputAreaBg: "#f0fdf4", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
-  dropdownBg: "#fff", dropdownShadow: "0 8px 24px rgba(0,0,0,0.12)",
+  dropdownBg: "#faf8f5", dropdownShadow: "0 8px 24px rgba(0,0,0,0.12)",
   errorBg: "rgba(204,0,0,0.06)", errorBorder: "rgba(204,0,0,0.15)", errorText: "#cc0000",
   urgentBg: "rgba(220,38,38,0.08)", ictusBg: "rgba(220,38,38,0.12)",
 };
@@ -217,6 +224,7 @@ export default function Page() {
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
   const [ff, setFf] = useState("");
+  const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
 
   const fEndRef = useRef(null);
   const cEndRef = useRef(null);
@@ -249,7 +257,21 @@ export default function Page() {
       throw new Error(errData.error || `Error ${r.status}`);
     }
     const d = await r.json();
-    return (d.content || []).map(b => b.text || "").join("");
+    const text = (d.content || []).map(b => b.text || "").join("");
+    // Track spending from usage data returned by the Anthropic API
+    if (d.usage) {
+      const p = PRICING[model] || PRICING["claude-sonnet-4-20250514"];
+      const inTok = d.usage.input_tokens || 0;
+      const outTok = d.usage.output_tokens || 0;
+      const cost = (inTok * p.input + outTok * p.output) / 1_000_000;
+      setSpending(prev => ({
+        totalCost: prev.totalCost + cost,
+        inputTokens: prev.inputTokens + inTok,
+        outputTokens: prev.outputTokens + outTok,
+        calls: prev.calls + 1,
+      }));
+    }
+    return text;
   };
 
   const clean = (s) => { let t = s.trim(); if (t.startsWith("```html")) t = t.slice(7); else if (t.startsWith("```")) t = t.slice(3); if (t.endsWith("```")) t = t.slice(0, -3); return t.trim(); };
@@ -284,7 +306,7 @@ export default function Page() {
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
 
@@ -306,7 +328,8 @@ export default function Page() {
     fg: { marginBottom: 14 },
     lb: { display: "block", fontSize: 11, fontWeight: 600, color: P.text3, marginBottom: 4, letterSpacing: 0.3, textTransform: "uppercase" },
     inp: (f) => ({ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", transition: "border-color 0.2s, background 0.2s" }),
-    sel: { width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + P.inputBorder, background: P.inputBg, color: P.text, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", cursor: "pointer" },
+    sel: { width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + P.inputBorder, background: isDark ? P.inputBg : "#ece7db", color: P.text, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", cursor: "pointer" },
+    selOpt: { background: isDark ? "#1a1a2e" : "#ece7db", color: P.text },
     taf: (f, bigH) => ({ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", minHeight: f ? (bigH || 180) : 56, lineHeight: 1.5, boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s, background 0.2s" }),
     chip: (v, cur) => ({ padding: "5px 12px", borderRadius: 18, border: v === cur ? "2px solid" : "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 13, fontWeight: v === cur ? 600 : 400, fontFamily: "inherit",
       background: v === cur ? (v === "urgente" ? P.urgentBg : v === "codigo_ictus" ? P.ictusBg : P.goldBg) : "transparent",
@@ -338,8 +361,29 @@ export default function Page() {
   return (
     <div style={S.root}>
       <div style={S.hdr}>
-        <div><div style={S.logo}>Asistente de Radiología</div><div style={S.sub}>Estación de informes</div></div>
+        <div><div style={S.logo}>asistente_de_radiolog<span style={{ color: isDark ? "#e8c547" : "#b8860b", textShadow: isDark ? "0 0 8px rgba(232,197,71,0.4)" : "none" }}>IA</span></div><div style={S.sub}>Estación de trabajo <span style={{ letterSpacing: 1, opacity: 0.7 }}>·</span> <span style={{ fontStyle: "italic", letterSpacing: 1, fontSize: 9, opacity: 0.6 }}>by Alexis Espinosa</span></div></div>
         <div style={S.hdrR}>
+          {spending.calls > 0 && <div style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "4px 12px",
+            borderRadius: 8, border: "1px dashed " + P.goldBorder,
+            background: isDark ? "rgba(196,151,60,0.06)" : "rgba(150,114,42,0.04)",
+            fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 11, color: P.text2,
+          }}>
+            <span style={{ fontSize: 14 }}>🧾</span>
+            <span style={{ fontWeight: 700, color: spending.totalCost >= 0.10 ? "#e67e22" : P.gold, fontSize: 13 }}>
+              {spending.totalCost < 0.01
+                ? (spending.totalCost * 1000).toFixed(2) + " milésimas $"
+                : spending.totalCost < 1
+                  ? (spending.totalCost * 100).toFixed(2) + "¢"
+                  : "$" + spending.totalCost.toFixed(2)}
+            </span>
+            <span style={{ color: P.text4 }}>|</span>
+            <span title={`${spending.inputTokens.toLocaleString()} entrada + ${spending.outputTokens.toLocaleString()} salida`}>
+              {((spending.inputTokens + spending.outputTokens) / 1000).toFixed(1)}k tok
+            </span>
+            <span style={{ color: P.text4 }}>|</span>
+            <span>{spending.calls} {spending.calls === 1 ? "llamada" : "llamadas"}</span>
+          </div>}
           <ThemeToggle themePref={themePref} setThemePref={setThemePref} P={P} />
           <div style={{ position: "relative" }}>
             <button onClick={() => setShowMP(!showMP)} style={S.mBtn}>{sm?.cost} {sm?.label} ▾</button>
@@ -361,7 +405,7 @@ export default function Page() {
             <div style={S.cs}>
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{ ...S.fg, flex: 1 }}><label style={S.lb}>Edad</label><input type="number" placeholder="—" value={ctx.age} onChange={e => setCtx({ ...ctx, age: e.target.value })} onFocus={() => setFf("ag")} onBlur={() => setFf("")} style={S.inp(ff === "ag")} /></div>
-                <div style={{ ...S.fg, flex: 1 }}><label style={S.lb}>Género</label><select value={ctx.gender} onChange={e => setCtx({ ...ctx, gender: e.target.value })} style={S.sel}><option value="">—</option><option value="Hombre">Hombre</option><option value="Mujer">Mujer</option></select></div>
+                <div style={{ ...S.fg, flex: 1 }}><label style={S.lb}>Género</label><select value={ctx.gender} onChange={e => setCtx({ ...ctx, gender: e.target.value })} style={S.sel}><option value="" style={S.selOpt}>—</option><option value="Hombre" style={S.selOpt}>Hombre</option><option value="Mujer" style={S.selOpt}>Mujer</option></select></div>
               </div>
               <div style={S.fg}><label style={S.lb}>Estudio solicitado</label><input type="text" placeholder="Ej: TC tórax con CIV, RM lumbar..." value={ctx.studyRequested} onChange={e => setCtx({ ...ctx, studyRequested: e.target.value })} onFocus={() => setFf("st")} onBlur={() => setFf("")} style={S.inp(ff === "st")} /></div>
               <div style={S.fg}><label style={S.lb}>Prioridad</label>
