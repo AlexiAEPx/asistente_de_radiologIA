@@ -20,6 +20,9 @@ const palette = (dark) => dark ? {
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.08)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#ccc",
   chatInputBg: "rgba(255,255,255,0.04)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#e0ddd5",
   chatInputAreaBg: "#0f1f16", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
+  codesPanelBg: "linear-gradient(180deg,#1a1018,#1a1420)", codesHeader: "#1f1424", codesHeaderBorder: "rgba(220,38,38,0.2)", codesTitleColor: "#f87171",
+  codesCardBg: "rgba(220,38,38,0.06)", codesCardBorder: "rgba(220,38,38,0.15)", codesCardHeaderBg: "rgba(220,38,38,0.08)",
+  codesItemBg: "rgba(255,255,255,0.04)", codesItemBorder: "rgba(255,255,255,0.08)",
   dropdownBg: "#1a1a2e", dropdownShadow: "0 8px 24px rgba(0,0,0,0.5)",
   errorBg: "rgba(204,0,0,0.1)", errorBorder: "rgba(204,0,0,0.2)", errorText: "#ff6b6b",
   urgentBg: "rgba(220,38,38,0.15)", ictusBg: "rgba(220,38,38,0.25)",
@@ -36,6 +39,9 @@ const palette = (dark) => dark ? {
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.06)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#555",
   chatInputBg: "rgba(255,255,255,0.8)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#333",
   chatInputAreaBg: "#f0fdf4", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
+  codesPanelBg: "linear-gradient(180deg,#fffbfb,#fdf5f5)", codesHeader: "#fef2f2", codesHeaderBorder: "#fecaca", codesTitleColor: "#b91c1c",
+  codesCardBg: "rgba(220,38,38,0.04)", codesCardBorder: "rgba(220,38,38,0.15)", codesCardHeaderBg: "rgba(220,38,38,0.06)",
+  codesItemBg: "#fff", codesItemBorder: "#f0e0e0",
   dropdownBg: "#fff", dropdownShadow: "0 8px 24px rgba(0,0,0,0.12)",
   errorBg: "rgba(204,0,0,0.06)", errorBorder: "rgba(204,0,0,0.15)", errorText: "#cc0000",
   urgentBg: "rgba(220,38,38,0.08)", ictusBg: "rgba(220,38,38,0.12)",
@@ -217,6 +223,7 @@ export default function Page() {
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
   const [ff, setFf] = useState("");
+  const [expandedCodes, setExpandedCodes] = useState({});
 
   const fEndRef = useRef(null);
   const cEndRef = useRef(null);
@@ -287,6 +294,34 @@ export default function Page() {
   const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
+  const toggleCode = (key) => setExpandedCodes(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const MEDICAL_CODES = [
+    { key: "trauma", icon: "🩸", title: "Código Trauma", desc: "Activación del equipo de trauma ante paciente politraumatizado", items: [
+      { label: "Criterios de activación", text: "Mecanismo de alta energía, caída >3m, atropello, eyección de vehículo, muerte de ocupante, tiempo de extricación >20min." },
+      { label: "Estudios radiológicos", text: "Rx tórax y pelvis AP en box. Body-TC (cráneo, columna cervical, tórax, abdomen-pelvis con CIV) si estabilidad hemodinámica." },
+      { label: "Hallazgos críticos a comunicar", text: "Neumotórax a tensión, hemotórax masivo, taponamiento cardíaco, rotura aórtica, laceración esplénica/hepática con sangrado activo, fractura pélvica inestable." },
+      { label: "Protocolo de imagen", text: "TC multifásica: sin contraste (cráneo), arterial (tórax-abdomen), portal (abdomen-pelvis). Reconstrucciones óseas de columna completa." },
+    ]},
+    { key: "tep", icon: "🫁", title: "Código TEP", desc: "Tromboembolismo pulmonar — activación ante sospecha clínica", items: [
+      { label: "Criterios de activación", text: "Disnea súbita + dolor torácico pleurítico, taquicardia inexplicada, hipotensión con ingurgitación yugular, Wells ≥5 o dímero-D positivo." },
+      { label: "Estudios radiológicos", text: "AngioTC de arterias pulmonares (protocolo TEP). Valorar eco-cardio si inestabilidad hemodinámica y no se puede trasladar." },
+      { label: "Hallazgos críticos", text: "Trombo en tronco pulmonar o arterias principales (TEP masivo), signo de la silla de montar, dilatación VD (ratio VD/VI >1), reflujo a venas suprahepáticas, desviación septal." },
+      { label: "Signos asociados", text: "Infarto pulmonar (opacidad en cuña periférica), derrame pleural, atelectasias laminares. Valorar TVP concomitante si protocolo incluye MMII." },
+    ]},
+    { key: "medula", icon: "🦴", title: "Código Médula", desc: "Lesión medular aguda — emergencia neuroquirúrgica", items: [
+      { label: "Criterios de activación", text: "Déficit motor/sensitivo agudo con nivel medular, síndrome de cola de caballo, traumatismo con sospecha de lesión medular, retención urinaria aguda con clínica neurológica." },
+      { label: "Estudios radiológicos", text: "RM urgente de columna completa (sagital T1, T2, STIR; axial T2 del nivel afectado). TC si sospecha de fractura o contraindicación para RM." },
+      { label: "Hallazgos críticos", text: "Compresión medular por hernia, fragmento óseo o hematoma epidural, mielopatía (hiperintensidad intramedular en T2), estenosis de canal severa, fractura-luxación vertebral." },
+      { label: "Protocolo de imagen", text: "RM con secuencias sagitales T1, T2, STIR de columna completa. Axiales T2 y T1 del segmento afectado. Valorar contraste si sospecha tumoral o infecciosa." },
+    ]},
+    { key: "hemostasis", icon: "🔴", title: "Código Hemostasis", desc: "Hemorragia masiva — activación del protocolo de transfusión", items: [
+      { label: "Criterios de activación", text: "Hemorragia activa con inestabilidad hemodinámica, necesidad prevista de transfusión masiva (>10 CH en 24h), shock hemorrágico, sangrado no controlable." },
+      { label: "Estudios radiológicos", text: "AngioTC del territorio sospechoso (tórax, abdomen, pelvis). Protocolo multifásico para identificar sangrado activo (extravasación de contraste)." },
+      { label: "Hallazgos críticos", text: "Extravasación activa de contraste (blush arterial), pseudoaneurisma, hemoperitoneo/hemotórax, hematoma retroperitoneal en expansión." },
+      { label: "Papel del radiólogo", text: "Identificar foco hemorrágico para planificar embolización por radiología intervencionista. Comunicación inmediata con intervencionismo y cirugía." },
+    ]},
+  ];
 
   const S = {
     root: { display: "flex", flexDirection: "column", height: "100vh", width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: "hidden", transition: "background 0.3s, color 0.3s" },
@@ -392,10 +427,46 @@ export default function Page() {
 
         <div style={S.rp}>
           <div style={S.tb}>
+            <Tab active={rTab === "codes"} icon="🚨" label="Códigos" onClick={() => setRTab("codes")} P={P} />
             <Tab active={rTab === "report"} icon="📄" label="Informe" badge={!!report && rTab !== "report"} onClick={() => setRTab("report")} P={P} />
             <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" badge={!!analysis && rTab !== "analysis"} onClick={() => setRTab("analysis")} P={P} />
             <Tab active={rTab === "chat"} icon="💬" label="Chat" badge={cMsgs.length > 0 && rTab !== "chat"} onClick={() => setRTab("chat")} P={P} />
           </div>
+
+          {rTab === "codes" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            <div style={{ ...S.rh, background: P.codesHeader, borderColor: P.codesHeaderBorder }}><span style={{ ...S.rt, color: P.codesTitleColor }}>Códigos de activación</span></div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", background: P.codesPanelBg }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {MEDICAL_CODES.map(code => (
+                  <div key={code.key} style={{ borderRadius: 10, border: "1px solid " + P.codesCardBorder, background: P.codesCardBg, overflow: "hidden", transition: "all 0.2s" }}>
+                    <button onClick={() => toggleCode(code.key)} style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
+                      background: expandedCodes[code.key] ? P.codesCardHeaderBg : "transparent",
+                      border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                      borderBottom: expandedCodes[code.key] ? "1px solid " + P.codesCardBorder : "none",
+                    }}>
+                      <span style={{ fontSize: 20 }}>{code.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: P.codesTitleColor }}>{code.title}</div>
+                        <div style={{ fontSize: 12, color: P.text3, marginTop: 2 }}>{code.desc}</div>
+                      </div>
+                      <span style={{ fontSize: 16, color: P.text3, transition: "transform 0.2s", transform: expandedCodes[code.key] ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                    </button>
+                    {expandedCodes[code.key] && (
+                      <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                        {code.items.map((item, idx) => (
+                          <div key={idx} style={{ padding: "10px 14px", borderRadius: 8, background: P.codesItemBg, border: "1px solid " + P.codesItemBorder }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: P.codesTitleColor, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{item.label}</div>
+                            <div style={{ fontSize: 13, color: P.text2, lineHeight: 1.6 }}>{item.text}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>}
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={S.rh}><span style={S.rt}>Informe</span>{report && <div style={{ display: "flex", gap: 5 }}><button onClick={cpText} style={S.cb("p", copied === "t")}>{copied === "t" ? "✓ Copiado" : "📋 Texto"}</button><button onClick={cpHtml} style={S.cb("s", copied === "h")}>{copied === "h" ? "✓ Copiado" : "HTML"}</button></div>}</div>
