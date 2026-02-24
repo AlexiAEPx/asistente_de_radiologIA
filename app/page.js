@@ -803,7 +803,7 @@ export default function Page() {
           </div>
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={S.rh}><span style={S.rt}>Informe</span>{report && <div style={{ display: "flex", gap: 5 }}><button onClick={cpText} style={S.cb("p", copied === "t")}>{copied === "t" ? "✓ Copiado" : "📋 Texto"}</button><button onClick={cpHtml} style={S.cb("s", copied === "h")}>{copied === "h" ? "✓ Copiado" : "HTML"}</button></div>}</div>
+            <div style={S.rh}><span style={S.rt}>Informe</span>{report && <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>}</div>
             <div className="rpt-content" style={S.rc}><style>{`
 .rpt-content [style*="border-top:1px solid #eee"],.rpt-content [style*="border-top:2px solid #888"]{border-top-color:transparent!important}
 .rpt-content [style*="border-bottom:1px solid #ccc"]{border-bottom-color:transparent!important}
