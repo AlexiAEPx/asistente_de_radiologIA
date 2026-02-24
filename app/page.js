@@ -27,6 +27,9 @@ const palette = (dark) => dark ? {
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.08)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#ccc",
   chatInputBg: "rgba(255,255,255,0.04)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#e0ddd5",
   chatInputAreaBg: "#0f1f16", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
+  codesPanelBg: "linear-gradient(180deg,#1a1018,#1a1420)", codesHeader: "#1f1424", codesHeaderBorder: "rgba(220,38,38,0.2)", codesTitleColor: "#f87171",
+  codesCardBg: "rgba(220,38,38,0.06)", codesCardBorder: "rgba(220,38,38,0.15)", codesCardHeaderBg: "rgba(220,38,38,0.08)",
+  codesItemBg: "rgba(255,255,255,0.04)", codesItemBorder: "rgba(255,255,255,0.08)",
   keyIdeasBg: "linear-gradient(180deg,#1a1520,#181422)", keyIdeasHeader: "#1c1628", keyIdeasHeaderBorder: "rgba(217,119,6,0.2)", keyIdeasTitleColor: "#fbbf24",
   justifBg: "linear-gradient(180deg,#1a1424,#18122a)", justifHeader: "#1e1630", justifHeaderBorder: "rgba(168,85,247,0.2)", justifTitleColor: "#c084fc",
   diffDiagBg: "linear-gradient(180deg,#141a1e,#121820)", diffDiagHeader: "#161e24", diffDiagHeaderBorder: "rgba(239,68,68,0.2)", diffDiagTitleColor: "#f87171",
@@ -51,6 +54,9 @@ const palette = (dark) => dark ? {
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.06)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#555",
   chatInputBg: "rgba(255,255,255,0.8)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#333",
   chatInputAreaBg: "#f0fdf4", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
+  codesPanelBg: "linear-gradient(180deg,#fffbfb,#fdf5f5)", codesHeader: "#fef2f2", codesHeaderBorder: "#fecaca", codesTitleColor: "#b91c1c",
+  codesCardBg: "rgba(220,38,38,0.04)", codesCardBorder: "rgba(220,38,38,0.15)", codesCardHeaderBg: "rgba(220,38,38,0.06)",
+  codesItemBg: "#fff", codesItemBorder: "#f0e0e0",
   keyIdeasBg: "linear-gradient(180deg,#fffbf5,#fef7ed)", keyIdeasHeader: "#fef3e2", keyIdeasHeaderBorder: "#fde68a", keyIdeasTitleColor: "#92400e",
   justifBg: "linear-gradient(180deg,#fdf8ff,#f5f0ff)", justifHeader: "#f3e8ff", justifHeaderBorder: "#d8b4fe", justifTitleColor: "#6b21a8",
   diffDiagBg: "linear-gradient(180deg,#fef9f9,#fdf5f5)", diffDiagHeader: "#fef2f2", diffDiagHeaderBorder: "#fecaca", diffDiagTitleColor: "#991b1b",
@@ -80,7 +86,7 @@ const buildCtxBlock = (c) => {
   if (c.age) p.push("Edad: " + c.age + " años");
   if (c.gender) p.push("Género: " + c.gender);
   if (c.studyRequested) p.push("Estudio solicitado: " + c.studyRequested);
-  if (c.priority && c.priority !== "programado") p.push("Prioridad: " + c.priority.toUpperCase());
+  if (c.priority && c.priority !== "programado") { const codeLabels = { urgente: "URGENTE", codigo_ictus: "CÓDIGO ICTUS", codigo_trauma: "CÓDIGO TRAUMA", codigo_tep: "CÓDIGO TEP", codigo_medula: "CÓDIGO MÉDULA", codigo_hemostasis: "CÓDIGO HEMOSTASIS" }; p.push("Prioridad: " + (codeLabels[c.priority] || c.priority.toUpperCase())); }
   if (c.reason) p.push("Motivo: " + c.reason);
   const ch = joinEntries(c.clinicalHistory);
   if (ch) p.push("Antecedentes:\n" + ch);
@@ -136,7 +142,7 @@ Piensa SIEMPRE: ¿este hallazgo normal es relevante para el diagnóstico, estadi
 - Conclusión: SOLO patología, negrita, mayor→menor gravedad
 - TODAS las estructuras evaluables con normalidad detallada
 - Si informes previos: COMPARAR hallazgos
-- Código ictus→"CÓDIGO ICTUS"+ASPECTS | Urgente→"URGENTE"
+- Código ictus→"CÓDIGO ICTUS"+ASPECTS | Código trauma→"CÓDIGO TRAUMA" body-TC | Código TEP→"CÓDIGO TEP" AngioTC pulmonar, ratio VD/VI | Código médula→"CÓDIGO MÉDULA" RM urgente | Código hemostasis→"CÓDIGO HEMOSTASIS" AngioTC, sangrado activo | Urgente→"URGENTE"
 - Medidas con plano entre paréntesis | Escoliosis párrafo separado
 
 ## COMPLETITUD OBLIGATORIA
@@ -656,7 +662,9 @@ export default function Page() {
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
+  const [showCodeDrop, setShowCodeDrop] = useState(false);
   const [ff, setFf] = useState("");
+  const [expandedCodes, setExpandedCodes] = useState({});
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
   const [history, setHistory] = useState([]);
 
@@ -838,9 +846,37 @@ export default function Page() {
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
+  const toggleCode = (key) => setExpandedCodes(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const MEDICAL_CODES = [
+    { key: "trauma", icon: "🩸", title: "Código Trauma", desc: "Activación del equipo de trauma ante paciente politraumatizado", items: [
+      { label: "Criterios de activación", text: "Mecanismo de alta energía, caída >3m, atropello, eyección de vehículo, muerte de ocupante, tiempo de extricación >20min." },
+      { label: "Estudios radiológicos", text: "Rx tórax y pelvis AP en box. Body-TC (cráneo, columna cervical, tórax, abdomen-pelvis con CIV) si estabilidad hemodinámica." },
+      { label: "Hallazgos críticos a comunicar", text: "Neumotórax a tensión, hemotórax masivo, taponamiento cardíaco, rotura aórtica, laceración esplénica/hepática con sangrado activo, fractura pélvica inestable." },
+      { label: "Protocolo de imagen", text: "TC multifásica: sin contraste (cráneo), arterial (tórax-abdomen), portal (abdomen-pelvis). Reconstrucciones óseas de columna completa." },
+    ]},
+    { key: "tep", icon: "🫁", title: "Código TEP", desc: "Tromboembolismo pulmonar — activación ante sospecha clínica", items: [
+      { label: "Criterios de activación", text: "Disnea súbita + dolor torácico pleurítico, taquicardia inexplicada, hipotensión con ingurgitación yugular, Wells ≥5 o dímero-D positivo." },
+      { label: "Estudios radiológicos", text: "AngioTC de arterias pulmonares (protocolo TEP). Valorar eco-cardio si inestabilidad hemodinámica y no se puede trasladar." },
+      { label: "Hallazgos críticos", text: "Trombo en tronco pulmonar o arterias principales (TEP masivo), signo de la silla de montar, dilatación VD (ratio VD/VI >1), reflujo a venas suprahepáticas, desviación septal." },
+      { label: "Signos asociados", text: "Infarto pulmonar (opacidad en cuña periférica), derrame pleural, atelectasias laminares. Valorar TVP concomitante si protocolo incluye MMII." },
+    ]},
+    { key: "medula", icon: "🦴", title: "Código Médula", desc: "Lesión medular aguda — emergencia neuroquirúrgica", items: [
+      { label: "Criterios de activación", text: "Déficit motor/sensitivo agudo con nivel medular, síndrome de cola de caballo, traumatismo con sospecha de lesión medular, retención urinaria aguda con clínica neurológica." },
+      { label: "Estudios radiológicos", text: "RM urgente de columna completa (sagital T1, T2, STIR; axial T2 del nivel afectado). TC si sospecha de fractura o contraindicación para RM." },
+      { label: "Hallazgos críticos", text: "Compresión medular por hernia, fragmento óseo o hematoma epidural, mielopatía (hiperintensidad intramedular en T2), estenosis de canal severa, fractura-luxación vertebral." },
+      { label: "Protocolo de imagen", text: "RM con secuencias sagitales T1, T2, STIR de columna completa. Axiales T2 y T1 del segmento afectado. Valorar contraste si sospecha tumoral o infecciosa." },
+    ]},
+    { key: "hemostasis", icon: "🔴", title: "Código Hemostasis", desc: "Hemorragia masiva — activación del protocolo de transfusión", items: [
+      { label: "Criterios de activación", text: "Hemorragia activa con inestabilidad hemodinámica, necesidad prevista de transfusión masiva (>10 CH en 24h), shock hemorrágico, sangrado no controlable." },
+      { label: "Estudios radiológicos", text: "AngioTC del territorio sospechoso (tórax, abdomen, pelvis). Protocolo multifásico para identificar sangrado activo (extravasación de contraste)." },
+      { label: "Hallazgos críticos", text: "Extravasación activa de contraste (blush arterial), pseudoaneurisma, hemoperitoneo/hemotórax, hematoma retroperitoneal en expansión." },
+      { label: "Papel del radiólogo", text: "Identificar foco hemorrágico para planificar embolización por radiología intervencionista. Comunicación inmediata con intervencionismo y cirugía." },
+    ]},
+  ];
 
   const S = {
     root: { display: "flex", flexDirection: "column", height: "100vh", width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: "hidden", transition: "background 0.3s, color 0.3s" },
@@ -866,10 +902,10 @@ export default function Page() {
     sel: { width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + P.inputBorder, background: isDark ? P.inputBg : "#ece7db", color: P.text, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", cursor: "pointer" },
     selOpt: { background: isDark ? "#1a1a2e" : "#ece7db", color: P.text },
     taf: (f, bigH) => ({ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", minHeight: f ? (bigH || 180) : 56, lineHeight: 1.5, boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s, background 0.2s" }),
-    chip: (v, cur) => ({ padding: "5px 12px", borderRadius: 18, border: v === cur ? "2px solid" : "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 13, fontWeight: v === cur ? 600 : 400, fontFamily: "inherit",
-      background: v === cur ? (v === "urgente" ? P.urgentBg : v === "codigo_ictus" ? P.ictusBg : P.goldBg) : "transparent",
-      color: v === cur ? (v !== "programado" ? "#ef4444" : P.gold) : P.text3,
-      borderColor: v === cur ? (v !== "programado" ? "#ef4444" : P.gold) : P.goldBorder }),
+    chip: (v, cur) => { const isCode = cur && cur.startsWith("codigo_"); const active = v === "codigo" ? isCode : v === cur; const isUrgentType = v === "urgente" || v === "codigo"; return { padding: "5px 12px", borderRadius: 18, border: active ? "2px solid" : "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 400, fontFamily: "inherit",
+      background: active ? (isUrgentType ? P.ictusBg : P.goldBg) : "transparent",
+      color: active ? (isUrgentType ? "#ef4444" : P.gold) : P.text3,
+      borderColor: active ? (isUrgentType ? "#ef4444" : P.gold) : P.goldBorder }; },
     ca: { flex: 1, overflowY: "auto", padding: "14px", display: "flex", flexDirection: "column", gap: 9 },
     ub: { alignSelf: "flex-end", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 3px 13px", fontSize: 14, lineHeight: 1.5, background: P.bubbleUser, color: "#fff" },
     ab: { alignSelf: "flex-start", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 13px 3px", fontSize: 13, lineHeight: 1.5, background: P.bubbleAsst, color: P.text2, border: "1px solid " + P.bubbleAsstBorder },
@@ -955,8 +991,19 @@ export default function Page() {
               </div>
               <div style={S.fg}><label style={S.lb}>Estudio solicitado</label><input type="text" placeholder="Ej: TC tórax con CIV, RM lumbar..." value={ctx.studyRequested} onChange={e => setCtx({ ...ctx, studyRequested: e.target.value })} onFocus={() => setFf("st")} onBlur={() => setFf("")} style={S.inp(ff === "st")} /></div>
               <div style={S.fg}><label style={S.lb}>Prioridad</label>
-                <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-                  {[["programado", "Programado"], ["urgente", "🔴 Urgente"], ["codigo_ictus", "🚨 Código Ictus"]].map(([v, l]) => (<button key={v} onClick={() => setCtx({ ...ctx, priority: v })} style={S.chip(v, ctx.priority)}>{l}</button>))}
+                <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+                  <button onClick={() => { setCtx({ ...ctx, priority: "programado" }); setShowCodeDrop(false); }} style={S.chip("programado", ctx.priority)}>Programado</button>
+                  <button onClick={() => { setCtx({ ...ctx, priority: "urgente" }); setShowCodeDrop(false); }} style={S.chip("urgente", ctx.priority)}>🔴 Urgente</button>
+                  <div style={{ position: "relative" }}>
+                    <button onClick={() => setShowCodeDrop(!showCodeDrop)} style={{ ...S.chip("codigo", ctx.priority), display: "flex", alignItems: "center", gap: 4 }}>
+                      🚨 {ctx.priority.startsWith("codigo_") ? { codigo_ictus: "C. Ictus", codigo_trauma: "C. Trauma", codigo_tep: "C. TEP", codigo_medula: "C. Médula", codigo_hemostasis: "C. Hemostasis" }[ctx.priority] : "Código"} ▾
+                    </button>
+                    {showCodeDrop && <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 10, padding: 5, zIndex: 100, minWidth: 200, boxShadow: P.dropdownShadow }}>
+                      {[["codigo_ictus", "🧠 Código Ictus"], ["codigo_trauma", "🩸 Código Trauma"], ["codigo_tep", "🫁 Código TEP"], ["codigo_medula", "🦴 Código Médula"], ["codigo_hemostasis", "🔴 Código Hemostasis"]].map(([v, l]) => (
+                        <div key={v} onClick={() => { setCtx({ ...ctx, priority: v }); setShowCodeDrop(false); }} style={{ padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: ctx.priority === v ? 600 : 400, background: ctx.priority === v ? P.ictusBg : "transparent", color: ctx.priority === v ? "#ef4444" : P.text2 }}>{l}</div>
+                      ))}
+                    </div>}
+                  </div>
                 </div></div>
               <div style={S.fg}><label style={S.lb}>Motivo de petición</label><input type="text" placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={S.inp(ff === "re")} /></div>
               <MultiEntryGroup entries={ctx.clinicalHistory} onChange={v => setCtx({ ...ctx, clinicalHistory: v })} label="Antecedentes clínicos" singularLabel="Antecedente" placeholder="Patologías, cirugías, tratamientos..." P={P} ff={ff} setFf={setFf} fieldKey="hi" />
@@ -1015,6 +1062,7 @@ export default function Page() {
 
         <div style={S.rp}>
           <div style={S.tb}>
+            <Tab active={rTab === "codes"} icon="🚨" label="Códigos" onClick={() => setRTab("codes")} P={P} />
             <Tab active={rTab === "report"} icon="📄" label="Informe" badge={!!report && rTab !== "report"} onClick={() => setRTab("report")} P={P} />
             <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" badge={!!analysis && rTab !== "analysis"} onClick={() => setRTab("analysis")} P={P} />
             <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} />
@@ -1023,6 +1071,41 @@ export default function Page() {
             <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} />
             <Tab active={rTab === "history"} icon="📚" label="Historial" badge={history.length > 0 && rTab !== "history"} onClick={() => setRTab("history")} P={P} />
           </div>
+
+          {rTab === "codes" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            <div style={{ ...S.rh, background: P.codesHeader, borderColor: P.codesHeaderBorder }}><span style={{ ...S.rt, color: P.codesTitleColor }}>Códigos de activación</span></div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", background: P.codesPanelBg }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {MEDICAL_CODES.map(code => (
+                  <div key={code.key} style={{ borderRadius: 10, border: "1px solid " + P.codesCardBorder, background: P.codesCardBg, overflow: "hidden", transition: "all 0.2s" }}>
+                    <button onClick={() => toggleCode(code.key)} style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
+                      background: expandedCodes[code.key] ? P.codesCardHeaderBg : "transparent",
+                      border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                      borderBottom: expandedCodes[code.key] ? "1px solid " + P.codesCardBorder : "none",
+                    }}>
+                      <span style={{ fontSize: 20 }}>{code.icon}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: P.codesTitleColor }}>{code.title}</div>
+                        <div style={{ fontSize: 12, color: P.text3, marginTop: 2 }}>{code.desc}</div>
+                      </div>
+                      <span style={{ fontSize: 16, color: P.text3, transition: "transform 0.2s", transform: expandedCodes[code.key] ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                    </button>
+                    {expandedCodes[code.key] && (
+                      <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                        {code.items.map((item, idx) => (
+                          <div key={idx} style={{ padding: "10px 14px", borderRadius: 8, background: P.codesItemBg, border: "1px solid " + P.codesItemBorder }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: P.codesTitleColor, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{item.label}</div>
+                            <div style={{ fontSize: 13, color: P.text2, lineHeight: 1.6 }}>{item.text}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>}
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={S.rh}><span style={S.rt}>Informe</span>{report && <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>}</div>
