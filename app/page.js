@@ -558,6 +558,11 @@ export default function Page() {
   const [showMP, setShowMP] = useState(false);
   const [ff, setFf] = useState("");
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
+  const [lpWidth, setLpWidth] = useState(42);
+  const [lpCollapsed, setLpCollapsed] = useState(false);
+  const lpWidthBeforeCollapse = useRef(42);
+  const dragging = useRef(false);
+  const mainRef = useRef(null);
 
   const fEndRef = useRef(null);
   const cEndRef = useRef(null);
@@ -566,6 +571,22 @@ export default function Page() {
 
   useEffect(() => { fEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [fMsgs, ldReport]);
   useEffect(() => { cEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [cMsgs, ldChat]);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragging.current || !mainRef.current) return;
+      const rect = mainRef.current.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const pct = (x / rect.width) * 100;
+      setLpWidth(Math.min(75, Math.max(20, pct)));
+    };
+    const onUp = () => { dragging.current = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove);
+    window.addEventListener("touchend", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onUp); };
+  }, []);
 
   const autoR = (ref) => { if (ref.current) { ref.current.style.height = "auto"; ref.current.style.height = Math.min(ref.current.scrollHeight, 300) + "px"; } };
   useEffect(() => autoR(fInpRef), [fInput]);
@@ -669,7 +690,10 @@ export default function Page() {
     mOpt: (a) => ({ display: "flex", justifyContent: "space-between", padding: "7px 10px", borderRadius: 6, cursor: "pointer", background: a ? P.goldBgActive : "transparent", color: a ? P.gold : P.text2, fontSize: 13, fontWeight: a ? 600 : 400 }),
     clr: { padding: "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: P.gold, fontSize: 12, cursor: "pointer", fontWeight: 600, fontFamily: "inherit" },
     main: { display: "flex", flex: 1, overflow: "hidden" },
-    lp: { display: "flex", flexDirection: "column", width: "42%", minWidth: 300, borderRight: "1px solid " + P.goldBorder },
+    lp: { display: lpCollapsed ? "none" : "flex", flexDirection: "column", width: lpWidth + "%", minWidth: 200, flexShrink: 0, transition: "width 0.2s" },
+    divider: { width: 6, cursor: lpCollapsed ? "default" : "col-resize", background: "transparent", flexShrink: 0, position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" },
+    dividerLine: { width: lpCollapsed ? 0 : 2, height: "100%", background: P.goldBorder, borderRadius: 1, transition: "background 0.2s, width 0.2s" },
+    collapseBtn: { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 20, height: 40, borderRadius: 4, border: "1px solid " + P.goldBorder, background: P.bg2, color: P.gold, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: "inherit", zIndex: 11, transition: "background 0.2s" },
     rp: { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 },
     tb: { display: "flex", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0 },
     cs: { flex: 1, overflowY: "auto", padding: "14px 16px" },
@@ -743,7 +767,7 @@ export default function Page() {
         </div>
       </div>
 
-      <div style={S.main}>
+      <div ref={mainRef} style={S.main}>
         <div style={S.lp}>
           <div style={S.tb}>
             <Tab active={lTab === "context"} icon="📋" label="Qué sabemos" onClick={() => setLTab("context")} P={P} />
@@ -790,6 +814,25 @@ export default function Page() {
               </div><div style={S.ht}>Shift+Enter nueva línea</div></div>
             </div>
           )}
+        </div>
+
+        <div
+          style={S.divider}
+          onMouseDown={(e) => { if (e.target.closest("[data-collapse]")) return; if (!lpCollapsed) { dragging.current = true; document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none"; } }}
+          onTouchStart={(e) => { if (e.target.closest("[data-collapse]")) return; if (!lpCollapsed) { dragging.current = true; document.body.style.userSelect = "none"; } }}
+          onMouseEnter={e => { const line = e.currentTarget.querySelector("[data-divline]"); if (line && !lpCollapsed) { line.style.width = "4px"; line.style.background = P.gold; } }}
+          onMouseLeave={e => { const line = e.currentTarget.querySelector("[data-divline]"); if (line && !dragging.current && !lpCollapsed) { line.style.width = "2px"; line.style.background = P.goldBorder; } }}
+        >
+          {!lpCollapsed && <div data-divline="" style={S.dividerLine} />}
+          <button
+            data-collapse=""
+            onClick={() => {
+              if (lpCollapsed) { setLpCollapsed(false); setLpWidth(lpWidthBeforeCollapse.current); }
+              else { lpWidthBeforeCollapse.current = lpWidth; setLpCollapsed(true); }
+            }}
+            style={S.collapseBtn}
+            title={lpCollapsed ? "Expandir panel izquierdo" : "Colapsar panel izquierdo"}
+          >{lpCollapsed ? "\u25B6" : "\u25C0"}</button>
         </div>
 
         <div style={S.rp}>
