@@ -52,6 +52,7 @@ const CORRECTIONS = `"sin defectos de reflexión"→"sin defectos de repleción"
 
 const buildCtxBlock = (c) => {
   const p = [];
+  if (c.freeText) p.push("Información clínica general (sin clasificar):\n" + c.freeText);
   if (c.age) p.push("Edad: " + c.age + " años");
   if (c.gender) p.push("Género: " + c.gender);
   if (c.studyRequested) p.push("Estudio solicitado: " + c.studyRequested);
@@ -241,7 +242,7 @@ function ThemeToggle({ themePref, setThemePref, P }) {
 }
 
 export default function Page() {
-  const emptyCtx = { age: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: "", priorRadiology: "", clinicalReports: "" };
+  const emptyCtx = { age: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: "", priorRadiology: "", clinicalReports: "", freeText: "" };
 
   const [themePref, setThemePref] = useState("auto");
   const [systemDark, setSystemDark] = useState(false);
@@ -454,6 +455,16 @@ export default function Page() {
           </div>
           {lTab === "context" ? (
             <div style={S.cs}>
+              <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 12, border: "1px dashed " + P.goldBorder, background: P.goldBg }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: P.gold, marginBottom: 2 }}>🍲 El Totum Revolutum</label>
+                <span style={{ display: "block", fontSize: 11, color: P.text3, marginBottom: 8, lineHeight: 1.4 }}>No te compliques: pega aquí todo el churro (edad, informes, lo que sea) y nosotros nos apañamos</span>
+                <textarea placeholder="Pega aquí todo lo que tengas: edad, sexo, antecedentes, informes previos, informes clínicos, motivo... todo revuelto, sin orden ni concierto." value={ctx.freeText} onChange={e => setCtx({ ...ctx, freeText: e.target.value })} onFocus={() => setFf("ft")} onBlur={() => setFf("")} style={{ ...S.taf(ff === "ft", 120), borderStyle: "dashed" }} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ flex: 1, height: 1, background: P.goldBorder }} />
+                <span style={{ fontSize: 10, color: P.text4, textTransform: "uppercase", letterSpacing: 1.5, whiteSpace: "nowrap" }}>o si eres buen@ y quieres separar</span>
+                <div style={{ flex: 1, height: 1, background: P.goldBorder }} />
+              </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{ ...S.fg, flex: 1 }}><label style={S.lb}>Edad</label><input type="number" placeholder="—" value={ctx.age} onChange={e => setCtx({ ...ctx, age: e.target.value })} onFocus={() => setFf("ag")} onBlur={() => setFf("")} style={S.inp(ff === "ag")} /></div>
                 <div style={{ ...S.fg, flex: 1 }}><label style={S.lb}>Género</label><select value={ctx.gender} onChange={e => setCtx({ ...ctx, gender: e.target.value })} style={S.sel}><option value="" style={S.selOpt}>—</option><option value="Hombre" style={S.selOpt}>Hombre</option><option value="Mujer" style={S.selOpt}>Mujer</option></select></div>
