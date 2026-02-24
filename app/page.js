@@ -54,7 +54,7 @@ const buildCtxBlock = (c) => {
   if (c.age) p.push("Edad: " + c.age + " años");
   if (c.gender) p.push("Género: " + c.gender);
   if (c.studyRequested) p.push("Estudio solicitado: " + c.studyRequested);
-  if (c.priority && c.priority !== "programado") p.push("Prioridad: " + c.priority.toUpperCase());
+  if (c.priority && c.priority !== "programado") { const codeLabels = { urgente: "URGENTE", codigo_ictus: "CÓDIGO ICTUS", codigo_trauma: "CÓDIGO TRAUMA", codigo_tep: "CÓDIGO TEP", codigo_medula: "CÓDIGO MÉDULA", codigo_hemostasis: "CÓDIGO HEMOSTASIS" }; p.push("Prioridad: " + (codeLabels[c.priority] || c.priority.toUpperCase())); }
   if (c.reason) p.push("Motivo: " + c.reason);
   if (c.clinicalHistory) p.push("Antecedentes:\n" + c.clinicalHistory);
   if (c.priorRadiology) p.push("Informes radiológicos previos:\n" + c.priorRadiology);
@@ -96,7 +96,7 @@ ${buildCtxBlock(c)}
 - Conclusión: SOLO patología, negrita, mayor→menor gravedad
 - TODAS las estructuras evaluables con normalidad detallada
 - Si informes previos: COMPARAR hallazgos
-- Código ictus→"CÓDIGO ICTUS"+ASPECTS | Urgente→"URGENTE"
+- Código ictus→"CÓDIGO ICTUS"+ASPECTS | Código trauma→"CÓDIGO TRAUMA" body-TC | Código TEP→"CÓDIGO TEP" AngioTC pulmonar, ratio VD/VI | Código médula→"CÓDIGO MÉDULA" RM urgente | Código hemostasis→"CÓDIGO HEMOSTASIS" AngioTC, sangrado activo | Urgente→"URGENTE"
 - Medidas con plano entre paréntesis | Escoliosis párrafo separado
 
 ## COMPLETITUD OBLIGATORIA
@@ -222,6 +222,7 @@ export default function Page() {
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
+  const [showCodeDrop, setShowCodeDrop] = useState(false);
   const [ff, setFf] = useState("");
   const [expandedCodes, setExpandedCodes] = useState({});
 
@@ -291,7 +292,7 @@ export default function Page() {
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
   const toggleCode = (key) => setExpandedCodes(prev => ({ ...prev, [key]: !prev[key] }));
@@ -343,10 +344,10 @@ export default function Page() {
     inp: (f) => ({ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", transition: "border-color 0.2s, background 0.2s" }),
     sel: { width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + P.inputBorder, background: P.inputBg, color: P.text, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", cursor: "pointer" },
     taf: (f, bigH) => ({ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", minHeight: f ? (bigH || 180) : 56, lineHeight: 1.5, boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s, background 0.2s" }),
-    chip: (v, cur) => ({ padding: "5px 12px", borderRadius: 18, border: v === cur ? "2px solid" : "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 13, fontWeight: v === cur ? 600 : 400, fontFamily: "inherit",
-      background: v === cur ? (v === "urgente" ? P.urgentBg : v === "codigo_ictus" ? P.ictusBg : P.goldBg) : "transparent",
-      color: v === cur ? (v !== "programado" ? "#ef4444" : P.gold) : P.text3,
-      borderColor: v === cur ? (v !== "programado" ? "#ef4444" : P.gold) : P.goldBorder }),
+    chip: (v, cur) => { const isCode = cur && cur.startsWith("codigo_"); const active = v === "codigo" ? isCode : v === cur; const isUrgentType = v === "urgente" || v === "codigo"; return { padding: "5px 12px", borderRadius: 18, border: active ? "2px solid" : "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 13, fontWeight: active ? 600 : 400, fontFamily: "inherit",
+      background: active ? (isUrgentType ? P.ictusBg : P.goldBg) : "transparent",
+      color: active ? (isUrgentType ? "#ef4444" : P.gold) : P.text3,
+      borderColor: active ? (isUrgentType ? "#ef4444" : P.gold) : P.goldBorder }; },
     ca: { flex: 1, overflowY: "auto", padding: "14px", display: "flex", flexDirection: "column", gap: 9 },
     ub: { alignSelf: "flex-end", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 3px 13px", fontSize: 14, lineHeight: 1.5, background: P.bubbleUser, color: "#fff" },
     ab: { alignSelf: "flex-start", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 13px 3px", fontSize: 13, lineHeight: 1.5, background: P.bubbleAsst, color: P.text2, border: "1px solid " + P.bubbleAsstBorder },
@@ -400,8 +401,19 @@ export default function Page() {
               </div>
               <div style={S.fg}><label style={S.lb}>Estudio solicitado</label><input type="text" placeholder="Ej: TC tórax con CIV, RM lumbar..." value={ctx.studyRequested} onChange={e => setCtx({ ...ctx, studyRequested: e.target.value })} onFocus={() => setFf("st")} onBlur={() => setFf("")} style={S.inp(ff === "st")} /></div>
               <div style={S.fg}><label style={S.lb}>Prioridad</label>
-                <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-                  {[["programado", "Programado"], ["urgente", "🔴 Urgente"], ["codigo_ictus", "🚨 Código Ictus"]].map(([v, l]) => (<button key={v} onClick={() => setCtx({ ...ctx, priority: v })} style={S.chip(v, ctx.priority)}>{l}</button>))}
+                <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+                  <button onClick={() => { setCtx({ ...ctx, priority: "programado" }); setShowCodeDrop(false); }} style={S.chip("programado", ctx.priority)}>Programado</button>
+                  <button onClick={() => { setCtx({ ...ctx, priority: "urgente" }); setShowCodeDrop(false); }} style={S.chip("urgente", ctx.priority)}>🔴 Urgente</button>
+                  <div style={{ position: "relative" }}>
+                    <button onClick={() => setShowCodeDrop(!showCodeDrop)} style={{ ...S.chip("codigo", ctx.priority), display: "flex", alignItems: "center", gap: 4 }}>
+                      🚨 {ctx.priority.startsWith("codigo_") ? { codigo_ictus: "C. Ictus", codigo_trauma: "C. Trauma", codigo_tep: "C. TEP", codigo_medula: "C. Médula", codigo_hemostasis: "C. Hemostasis" }[ctx.priority] : "Código"} ▾
+                    </button>
+                    {showCodeDrop && <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 10, padding: 5, zIndex: 100, minWidth: 200, boxShadow: P.dropdownShadow }}>
+                      {[["codigo_ictus", "🧠 Código Ictus"], ["codigo_trauma", "🩸 Código Trauma"], ["codigo_tep", "🫁 Código TEP"], ["codigo_medula", "🦴 Código Médula"], ["codigo_hemostasis", "🔴 Código Hemostasis"]].map(([v, l]) => (
+                        <div key={v} onClick={() => { setCtx({ ...ctx, priority: v }); setShowCodeDrop(false); }} style={{ padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: ctx.priority === v ? 600 : 400, background: ctx.priority === v ? P.ictusBg : "transparent", color: ctx.priority === v ? "#ef4444" : P.text2 }}>{l}</div>
+                      ))}
+                    </div>}
+                  </div>
                 </div></div>
               <div style={S.fg}><label style={S.lb}>Motivo de petición</label><input type="text" placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={S.inp(ff === "re")} /></div>
               <div style={S.fg}><label style={S.lb}>Antecedentes clínicos</label><textarea placeholder="Patologías, cirugías, tratamientos..." value={ctx.clinicalHistory} onChange={e => setCtx({ ...ctx, clinicalHistory: e.target.value })} onFocus={() => setFf("hi")} onBlur={() => setFf("")} style={S.taf(ff === "hi")} /></div>
