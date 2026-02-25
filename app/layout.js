@@ -7,11 +7,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <link
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
           rel="stylesheet"
         />
-        <style>{`* { margin: 0; padding: 0; box-sizing: border-box; } body { overflow: hidden; }`}</style>
+        <style>{`* { margin: 0; padding: 0; box-sizing: border-box; } body { overflow: hidden; } @media (max-width: 768px) { body { overflow: auto; overflow-x: hidden; } }`}</style>
       </head>
       <body>{children}</body>
     </html>
