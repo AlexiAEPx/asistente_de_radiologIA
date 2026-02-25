@@ -484,14 +484,15 @@ function LoadingDots({ text }) {
   );
 }
 
-function Tab({ active, icon, label, badge, onClick, P }) {
+function Tab({ active, icon, label, badge, onClick, P, compact }) {
   return (
     <button onClick={onClick} style={{
-      display: "flex", alignItems: "center", gap: 5, padding: "9px 13px",
+      display: "flex", alignItems: "center", gap: compact ? 3 : 5, padding: compact ? "7px 8px" : "9px 13px",
       background: active ? P.goldBgActive : "transparent",
       border: "none", borderBottom: active ? "2px solid " + P.gold : "2px solid transparent",
-      color: active ? P.gold : P.text3, fontSize: 13, fontWeight: active ? 600 : 400,
+      color: active ? P.gold : P.text3, fontSize: compact ? 11 : 13, fontWeight: active ? 600 : 400,
       cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap", fontFamily: "inherit",
+      flexShrink: 0,
     }}>
       <span>{icon}</span><span>{label}</span>
       {badge && <span style={{ width: 6, height: 6, borderRadius: "50%", background: P.gold }} />}
@@ -625,6 +626,8 @@ export default function Page() {
 
   const [themePref, setThemePref] = useState("auto");
   const [systemDark, setSystemDark] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState("left"); // "left" or "right"
 
   useEffect(() => {
     setSystemDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -632,6 +635,13 @@ export default function Page() {
     const h = (e) => setSystemDark(e.matches);
     mq.addEventListener("change", h);
     return () => mq.removeEventListener("change", h);
+  }, []);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   const isDark = themePref === "auto" ? systemDark : themePref === "dark";
@@ -801,6 +811,7 @@ export default function Page() {
     const t = fInput.trim(); if (!t || ldReport) return;
     setErr(""); const um = { role: "user", content: t }; const nm = [...fMsgs, um];
     setFMsgs(nm); setFInput(""); setLdReport(true); setRTab("report");
+    if (isMobile) setMobilePanel("right");
     try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), nm)); setFMsgs(p => [...p, { role: "assistant", content: h }]); setReport(h); setCtxSnap(JSON.stringify(ctx)); saveToHistory(h, ctx); }
     catch (e) { setErr("Error informe: " + e.message); } setLdReport(false);
   };
@@ -880,23 +891,29 @@ export default function Page() {
   ];
 
   const S = {
-    root: { display: "flex", flexDirection: "column", height: "100vh", width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: "hidden", transition: "background 0.3s, color 0.3s" },
-    hdr: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: 10, flexWrap: "wrap" },
-    logo: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 20, fontWeight: 700, color: P.gold, letterSpacing: 0.5 },
-    sub: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 10, color: P.goldDim, letterSpacing: 3, textTransform: "uppercase", marginTop: 1 },
-    hdrR: { display: "flex", alignItems: "center", gap: 8 },
-    mBtn: { display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", position: "relative" },
+    root: { display: "flex", flexDirection: "column", height: isMobile ? "auto" : "100vh", minHeight: isMobile ? "100vh" : undefined, width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: isMobile ? "auto" : "hidden", transition: "background 0.3s, color 0.3s" },
+    hdr: { display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: isMobile ? "8px 12px" : "10px 18px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: isMobile ? 6 : 10, flexWrap: "wrap" },
+    logo: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: isMobile ? 17 : 20, fontWeight: 700, color: P.gold, letterSpacing: 0.5 },
+    sub: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: isMobile ? 8 : 10, color: P.goldDim, letterSpacing: isMobile ? 2 : 3, textTransform: "uppercase", marginTop: 1 },
+    hdrR: { display: "flex", alignItems: "center", gap: isMobile ? 5 : 8, flexWrap: "wrap" },
+    mBtn: { display: "flex", alignItems: "center", gap: 5, padding: isMobile ? "4px 8px" : "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: isMobile ? 11 : 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", position: "relative" },
     mDrop: { position: "absolute", top: "calc(100% + 4px)", right: 0, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 10, padding: 5, zIndex: 100, minWidth: 170, boxShadow: P.dropdownShadow },
     mOpt: (a) => ({ display: "flex", justifyContent: "space-between", padding: "7px 10px", borderRadius: 6, cursor: "pointer", background: a ? P.goldBgActive : "transparent", color: a ? P.gold : P.text2, fontSize: 13, fontWeight: a ? 600 : 400 }),
-    clr: { padding: "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: P.gold, fontSize: 12, cursor: "pointer", fontWeight: 600, fontFamily: "inherit" },
-    main: { display: "flex", flex: 1, overflow: "hidden" },
-    lp: { display: lpCollapsed ? "none" : "flex", flexDirection: "column", width: lpWidth + "%", minWidth: 200, flexShrink: 0, transition: "width 0.2s" },
-    divider: { width: 6, cursor: lpCollapsed ? "default" : "col-resize", background: "transparent", flexShrink: 0, position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" },
+    clr: { padding: isMobile ? "4px 8px" : "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: P.gold, fontSize: isMobile ? 11 : 12, cursor: "pointer", fontWeight: 600, fontFamily: "inherit" },
+    main: { display: "flex", flexDirection: isMobile ? "column" : "row", flex: 1, overflow: isMobile ? "visible" : "hidden" },
+    lp: isMobile
+      ? { display: mobilePanel === "left" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)" }
+      : { display: lpCollapsed ? "none" : "flex", flexDirection: "column", width: lpWidth + "%", minWidth: 200, flexShrink: 0, transition: "width 0.2s" },
+    divider: isMobile
+      ? { display: "none" }
+      : { width: 6, cursor: lpCollapsed ? "default" : "col-resize", background: "transparent", flexShrink: 0, position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" },
     dividerLine: { width: lpCollapsed ? 0 : 2, height: "100%", background: P.goldBorder, borderRadius: 1, transition: "background 0.2s, width 0.2s" },
     collapseBtn: { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 20, height: 40, borderRadius: 4, border: "1px solid " + P.goldBorder, background: P.bg2, color: P.gold, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: "inherit", zIndex: 11, transition: "background 0.2s" },
-    rp: { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 },
-    tb: { display: "flex", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0 },
-    cs: { flex: 1, overflowY: "auto", padding: "14px 16px" },
+    rp: isMobile
+      ? { display: mobilePanel === "right" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)" }
+      : { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 },
+    tb: { display: "flex", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" },
+    cs: { flex: 1, overflowY: "auto", padding: isMobile ? "12px 10px" : "14px 16px" },
     fg: { marginBottom: 14 },
     lb: { display: "block", fontSize: 11, fontWeight: 600, color: P.text3, marginBottom: 4, letterSpacing: 0.3, textTransform: "uppercase" },
     inp: (f) => ({ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", transition: "border-color 0.2s, background 0.2s" }),
@@ -915,9 +932,9 @@ export default function Page() {
     ta: (f) => ({ flex: 1, resize: "none", border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), borderRadius: 10, padding: "9px 12px", fontSize: 14, lineHeight: 1.5, background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", minHeight: f ? 140 : 42, maxHeight: 300, overflow: "auto", boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s" }),
     sb: (d) => ({ width: 40, height: 40, borderRadius: 10, border: "none", cursor: d ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: d ? (isDark ? "#333" : "#ccc") : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", fontSize: 15, flexShrink: 0 }),
     ht: { fontSize: 10, color: P.text4, marginTop: 3 },
-    rh: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px", borderBottom: "1px solid " + P.reportHeaderBorder, background: P.reportHeader, flexShrink: 0, flexWrap: "wrap", gap: 5 },
-    rt: { fontSize: 13, fontWeight: 600, color: P.reportTitleColor, letterSpacing: 0.5, textTransform: "uppercase" },
-    rc: { flex: 1, overflowY: "auto", padding: "20px 24px", background: P.reportBg, color: P.text },
+    rh: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "8px 10px" : "9px 14px", borderBottom: "1px solid " + P.reportHeaderBorder, background: P.reportHeader, flexShrink: 0, flexWrap: "wrap", gap: 5 },
+    rt: { fontSize: isMobile ? 12 : 13, fontWeight: 600, color: P.reportTitleColor, letterSpacing: 0.5, textTransform: "uppercase" },
+    rc: { flex: 1, overflowY: "auto", padding: isMobile ? "14px 12px" : "20px 24px", background: P.reportBg, color: P.text },
     cb: (v, a) => ({ padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: a ? "#22c55e" : v === "p" ? P.gold : P.goldBg, color: a ? "#fff" : v === "p" ? "#fff" : P.gold }),
     lg: { display: "flex", gap: 10, flexWrap: "wrap", padding: "7px 14px", borderTop: "1px solid " + P.legendBorder, background: P.legendBg, flexShrink: 0 },
     ld: (c) => ({ width: 7, height: 7, borderRadius: "50%", background: c }),
@@ -932,11 +949,21 @@ export default function Page() {
 
   return (
     <div style={S.root}>
+      {isMobile && <style>{`
+        /* Hide scrollbar for mobile tab bars */
+        div[data-tabbar] { -ms-overflow-style: none; scrollbar-width: none; }
+        div[data-tabbar]::-webkit-scrollbar { display: none; }
+        /* Ensure HTML content from AI adapts to mobile */
+        .rpt-content div[style], .rpt-content p[style] { max-width: 100% !important; overflow-wrap: break-word !important; word-wrap: break-word !important; }
+        .rpt-content img { max-width: 100% !important; height: auto !important; }
+        .rpt-content table { max-width: 100% !important; display: block !important; overflow-x: auto !important; }
+        .rpt-content pre { max-width: 100% !important; overflow-x: auto !important; }
+      `}</style>}
       <div style={S.hdr}>
         <div><div style={S.logo}>asistente_de_radiolog<span style={{ color: isDark ? "#e8c547" : "#b8860b", textShadow: isDark ? "0 0 8px rgba(232,197,71,0.4)" : "none" }}>IA</span></div><div style={S.sub}>Estación de trabajo <span style={{ letterSpacing: 1, opacity: 0.7 }}>·</span> <span style={{ fontStyle: "italic", letterSpacing: 1, fontSize: 9, opacity: 0.6 }}>by Alexis Espinosa</span></div></div>
         <div style={S.hdrR}>
           {spending.calls > 0 && <div style={{
-            display: "flex", alignItems: "center", gap: 8, padding: "4px 12px",
+            display: isMobile ? "none" : "flex", alignItems: "center", gap: 8, padding: "4px 12px",
             borderRadius: 8, border: "1px dashed " + P.goldBorder,
             background: isDark ? "rgba(196,151,60,0.06)" : "rgba(150,114,42,0.04)",
             fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 11, color: P.text2,
@@ -970,7 +997,7 @@ export default function Page() {
             </button>
             {showHistory && <>
               <div onClick={() => setShowHistory(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
-              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 370, maxHeight: "70vh", background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 12, boxShadow: P.dropdownShadow, zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ position: isMobile ? "fixed" : "absolute", top: isMobile ? "auto" : "calc(100% + 6px)", bottom: isMobile ? 0 : "auto", left: isMobile ? 0 : "auto", right: isMobile ? 0 : 0, width: isMobile ? "100%" : 370, maxHeight: isMobile ? "60vh" : "70vh", background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: isMobile ? "12px 12px 0 0" : 12, boxShadow: P.dropdownShadow, zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid " + P.historyHeaderBorder, background: P.historyHeader }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: P.historyTitleColor }}>Historial de casos</span>
                   {history.length > 0 && <button onClick={clearHistory} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid " + P.historyClearBorder, background: P.historyClearBg, color: P.historyDeleteHover, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Borrar todo</button>}
@@ -1021,12 +1048,47 @@ export default function Page() {
         </div>
       </div>
 
+      {isMobile && (
+        <div style={{
+          display: "flex", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0,
+        }}>
+          <button
+            onClick={() => setMobilePanel("left")}
+            style={{
+              flex: 1, padding: "10px 0", border: "none", fontFamily: "inherit",
+              fontSize: 13, fontWeight: mobilePanel === "left" ? 700 : 400, cursor: "pointer",
+              background: mobilePanel === "left" ? P.goldBgActive : "transparent",
+              color: mobilePanel === "left" ? P.gold : P.text3,
+              borderBottom: mobilePanel === "left" ? "2px solid " + P.gold : "2px solid transparent",
+              transition: "all 0.2s",
+            }}
+          >
+            Contexto
+          </button>
+          <button
+            onClick={() => setMobilePanel("right")}
+            style={{
+              flex: 1, padding: "10px 0", border: "none", fontFamily: "inherit",
+              fontSize: 13, fontWeight: mobilePanel === "right" ? 700 : 400, cursor: "pointer",
+              background: mobilePanel === "right" ? P.goldBgActive : "transparent",
+              color: mobilePanel === "right" ? P.gold : P.text3,
+              borderBottom: mobilePanel === "right" ? "2px solid " + P.gold : "2px solid transparent",
+              transition: "all 0.2s",
+              position: "relative",
+            }}
+          >
+            Resultados
+            {report && mobilePanel === "left" && <span style={{ position: "absolute", top: 6, right: "20%", width: 7, height: 7, borderRadius: "50%", background: P.gold }} />}
+          </button>
+        </div>
+      )}
+
       <div ref={mainRef} style={S.main}>
         <div style={S.lp}>
-          <div style={S.tb}>
-            <Tab active={lTab === "context"} icon="📋" label="Qué sabemos" onClick={() => setLTab("context")} P={P} />
-            <Tab active={lTab === "findings"} icon="🔎" label="Qué vemos" badge={!!report && lTab !== "findings"} onClick={() => setLTab("findings")} P={P} />
-            <Tab active={lTab === "chat"} icon="💬" label="Chat" badge={cMsgs.length > 0 && lTab !== "chat"} onClick={() => setLTab("chat")} P={P} />
+          <div data-tabbar="" style={S.tb}>
+            <Tab active={lTab === "context"} icon="📋" label="Qué sabemos" onClick={() => setLTab("context")} P={P} compact={isMobile} />
+            <Tab active={lTab === "findings"} icon="🔎" label="Qué vemos" badge={!!report && lTab !== "findings"} onClick={() => setLTab("findings")} P={P} compact={isMobile} />
+            <Tab active={lTab === "chat"} icon="💬" label="Chat" badge={cMsgs.length > 0 && lTab !== "chat"} onClick={() => setLTab("chat")} P={P} compact={isMobile} />
           </div>
           {lTab === "context" ? (
             <div style={S.cs}>
@@ -1116,14 +1178,14 @@ export default function Page() {
         </div>
 
         <div style={S.rp}>
-          <div style={S.tb}>
-            <Tab active={rTab === "codes"} icon="🚨" label="Códigos" onClick={() => setRTab("codes")} P={P} />
-            <Tab active={rTab === "report"} icon="📄" label="Informe" badge={!!report && rTab !== "report"} onClick={() => setRTab("report")} P={P} />
-            <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" badge={!!analysis && rTab !== "analysis"} onClick={() => setRTab("analysis")} P={P} />
-            <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} />
-            <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" badge={!!justification && rTab !== "justification"} onClick={() => setRTab("justification")} P={P} />
-            <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" badge={!!diffDiag && rTab !== "diffDiag"} onClick={() => setRTab("diffDiag")} P={P} />
-            <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} />
+          <div data-tabbar="" style={S.tb}>
+            <Tab active={rTab === "codes"} icon="🚨" label="Códigos" onClick={() => setRTab("codes")} P={P} compact={isMobile} />
+            <Tab active={rTab === "report"} icon="📄" label="Informe" badge={!!report && rTab !== "report"} onClick={() => setRTab("report")} P={P} compact={isMobile} />
+            <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" badge={!!analysis && rTab !== "analysis"} onClick={() => setRTab("analysis")} P={P} compact={isMobile} />
+            <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} compact={isMobile} />
+            <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" badge={!!justification && rTab !== "justification"} onClick={() => setRTab("justification")} P={P} compact={isMobile} />
+            <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" badge={!!diffDiag && rTab !== "diffDiag"} onClick={() => setRTab("diffDiag")} P={P} compact={isMobile} />
+            <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} compact={isMobile} />
           </div>
 
           {rTab === "codes" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
