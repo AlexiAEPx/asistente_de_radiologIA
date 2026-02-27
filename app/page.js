@@ -556,7 +556,7 @@ function LoadingDots({ text }) {
   );
 }
 
-function Tab({ active, icon, label, badge, onClick, P, compact }) {
+function Tab({ active, icon, label, status, onClick, onRun, canRun, isRunning, P, compact }) {
   return (
     <button onClick={onClick} style={{
       display: "flex", alignItems: "center", gap: compact ? 3 : 5, padding: compact ? "7px 8px" : "9px 13px",
@@ -567,7 +567,32 @@ function Tab({ active, icon, label, badge, onClick, P, compact }) {
       flexShrink: 0,
     }}>
       <span>{icon}</span><span>{label}</span>
-      {badge && <span style={{ width: 6, height: 6, borderRadius: "50%", background: P.gold }} />}
+      {status && <span title={status === "unread" ? "Nuevo pendiente de revisar" : "Ya revisado"} style={{ width: 8, height: 8, borderRadius: "50%", background: status === "unread" ? "#22c55e" : "#fff", border: "1px solid " + (status === "unread" ? "#16a34a" : "rgba(255,255,255,0.6)") }} />}
+      {onRun && (
+        <span
+          role="button"
+          title={isRunning ? "Generando..." : "Ejecutar IA"}
+          onClick={(e) => { e.stopPropagation(); if (canRun && !isRunning) onRun(); }}
+          style={{
+            marginLeft: compact ? 2 : 4,
+            width: compact ? 18 : 20,
+            height: compact ? 18 : 20,
+            borderRadius: 999,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: compact ? 10 : 11,
+            background: canRun ? "rgba(34,197,94,0.15)" : "rgba(148,163,184,0.15)",
+            color: canRun ? "#22c55e" : P.text4,
+            border: "1px solid " + (canRun ? "rgba(34,197,94,0.35)" : P.goldBorder),
+            cursor: canRun && !isRunning ? "pointer" : "not-allowed",
+            opacity: isRunning ? 0.6 : 1,
+            pointerEvents: "auto",
+          }}
+        >
+          {isRunning ? "…" : "▶"}
+        </span>
+      )}
     </button>
   );
 }
@@ -773,8 +798,19 @@ export default function Page() {
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [tabStatus, setTabStatus] = useState({
+    clinicalContext: "idle",
+    report: "idle",
+    analysis: "idle",
+    keyIdeas: "idle",
+    justification: "idle",
+    diffDiag: "idle",
+    mindMap: "idle",
+  });
+  const rightTabbarRef = useRef(null);
 
   const clinicalContext = useMemo(() => buildClinicalContextHtml(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
+
 
   const getAgeFromBirthYear = (yearValue) => {
     const year = Number(yearValue);
@@ -929,8 +965,8 @@ export default function Page() {
     try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), fMsgs)); setReport(h); }
     catch (e) { setErr("Error regenerar: " + e.message); } setLdReport(false);
   };
-  const genAnalysis = async () => {
-    if (!report || ldAnalysis) return; setLdAnalysis(true); setErr(""); setRTab("analysis");
+  const genAnalysis = async (focusTab = true) => {
+    if (!report || ldAnalysis) return; setLdAnalysis(true); setErr(""); if (focusTab) setRTab("analysis");
     try { setAnalysis(clean(await callAPI(ANALYSIS_SYS(ctx, report), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }]))); }
     catch (e) { setErr("Error análisis: " + e.message); } setLdAnalysis(false);
   };
@@ -944,23 +980,23 @@ export default function Page() {
 }
     catch (e) { setErr("Error chat: " + e.message); } setLdChat(false);
   };
-  const genKeyIdeas = async () => {
-    if (!report || ldKeyIdeas) return; setLdKeyIdeas(true); setErr(""); setRTab("keyIdeas");
+  const genKeyIdeas = async (focusTab = true) => {
+    if (!report || ldKeyIdeas) return; setLdKeyIdeas(true); setErr(""); if (focusTab) setRTab("keyIdeas");
     try { setKeyIdeas(clean(await callAPI(KEY_IDEAS_SYS(ctx, report, analysis), [{ role: "user", content: "Genera las 10 ideas clave de este caso radiológico." }]))); }
     catch (e) { setErr("Error ideas clave: " + e.message); } setLdKeyIdeas(false);
   };
-  const genJustification = async () => {
-    if (!report || ldJustification) return; setLdJustification(true); setErr(""); setRTab("justification");
+  const genJustification = async (focusTab = true) => {
+    if (!report || ldJustification) return; setLdJustification(true); setErr(""); if (focusTab) setRTab("justification");
     try { setJustification(clean(await callAPI(JUSTIFICATION_SYS(ctx, report), [{ role: "user", content: "Analiza la justificación de esta prueba radiológica." }]))); }
     catch (e) { setErr("Error justificación: " + e.message); } setLdJustification(false);
   };
-  const genDiffDiag = async () => {
-    if (!report || ldDiffDiag) return; setLdDiffDiag(true); setErr(""); setRTab("diffDiag");
+  const genDiffDiag = async (focusTab = true) => {
+    if (!report || ldDiffDiag) return; setLdDiffDiag(true); setErr(""); if (focusTab) setRTab("diffDiag");
     try { setDiffDiag(clean(await callAPI(DIFF_DIAG_SYS(ctx, report, analysis), [{ role: "user", content: "Genera el diagnóstico diferencial con código semáforo para este caso." }]))); }
     catch (e) { setErr("Error diagnóstico diferencial: " + e.message); } setLdDiffDiag(false);
   };
-  const genMindMap = async () => {
-    if (!report || ldMindMap) return; setLdMindMap(true); setErr(""); setRTab("mindMap");
+  const genMindMap = async (focusTab = true) => {
+    if (!report || ldMindMap) return; setLdMindMap(true); setErr(""); if (focusTab) setRTab("mindMap");
     try { setMindMap(clean(await callAPI(MIND_MAP_SYS(ctx, report, analysis), [{ role: "user", content: "Genera un mapa mental visual completo de este caso radiológico." }]))); }
     catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
   };
@@ -1005,8 +1041,42 @@ export default function Page() {
     setShowPriorRadiology(false);
     setShowClinicalReports(false);
     setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
+    setTabStatus({ clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
   };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
+  const markTabRead = (tabKey) => {
+    setTabStatus(prev => prev[tabKey] === "unread" ? { ...prev, [tabKey]: "read" } : prev);
+  };
+  const openRightTab = (tabKey) => {
+    setRTab(tabKey);
+    markTabRead(tabKey);
+  };
+  const setTabSeenState = (tabKey, hasContent) => {
+    if (!hasContent) return;
+    setTabStatus(prev => ({ ...prev, [tabKey]: rTab === tabKey ? "read" : "unread" }));
+  };
+  useEffect(() => { setTabSeenState("report", !!report); }, [report, rTab]);
+  useEffect(() => { setTabSeenState("analysis", !!analysis); }, [analysis, rTab]);
+  useEffect(() => { setTabSeenState("keyIdeas", !!keyIdeas); }, [keyIdeas, rTab]);
+  useEffect(() => { setTabSeenState("justification", !!justification); }, [justification, rTab]);
+  useEffect(() => { setTabSeenState("diffDiag", !!diffDiag); }, [diffDiag, rTab]);
+  useEffect(() => { setTabSeenState("mindMap", !!mindMap); }, [mindMap, rTab]);
+
+  const scrollRightTabs = (delta) => {
+    if (!rightTabbarRef.current) return;
+    rightTabbarRef.current.scrollBy({ left: delta, behavior: "smooth" });
+  };
+
+  const rightTabsConfig = [
+    { key: "clinicalContext", icon: "🩺", label: "Contexto clínico", run: null, loading: false, canRun: false },
+    { key: "report", icon: "📄", label: "Informe", run: null, loading: ldReport, canRun: false },
+    { key: "analysis", icon: "🔍", label: "Análisis", run: () => genAnalysis(false), loading: ldAnalysis, canRun: !!report },
+    { key: "keyIdeas", icon: "💡", label: "Ideas Clave", run: () => genKeyIdeas(false), loading: ldKeyIdeas, canRun: !!report },
+    { key: "justification", icon: "❓", label: "¿Justificada?", run: () => genJustification(false), loading: ldJustification, canRun: !!report },
+    { key: "diffDiag", icon: "🚦", label: "Diferencial", run: () => genDiffDiag(false), loading: ldDiffDiag, canRun: !!report },
+    { key: "mindMap", icon: "🧠", label: "Mapa Mental", run: () => genMindMap(false), loading: ldMindMap, canRun: !!report },
+  ];
+
   const sm = MODELS.find(m => m.id === model);
   const S = {
     root: { display: "flex", flexDirection: "column", height: isMobile ? "auto" : "100vh", minHeight: isMobile ? "100vh" : undefined, width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: isMobile ? "auto" : "hidden", transition: "background 0.3s, color 0.3s" },
@@ -1030,7 +1100,8 @@ export default function Page() {
     rp: isMobile
       ? { display: mobilePanel === "right" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)" }
       : { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 },
-    tb: { display: "flex", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" },
+    tb: { display: "flex", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth" },
+    tabNavBtn: { width: 28, border: "none", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, color: P.gold, cursor: "pointer", fontSize: 15, flexShrink: 0 },
     cs: { flex: 1, overflowY: "auto", padding: isMobile ? "12px 10px" : "14px 16px" },
     fg: { marginBottom: 14 },
     lb: { display: "block", fontSize: 11, fontWeight: 600, color: P.text3, marginBottom: 4, letterSpacing: 0.3, textTransform: "uppercase" },
@@ -1270,7 +1341,7 @@ export default function Page() {
                     </div>}
                   </div>
                 </div></div>
-              <div style={S.fg}><label style={S.lb}>Motivo de petición</label><input type="text" placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={S.inp(ff === "re")} /></div>
+              <div style={S.fg}><label style={S.lb}>Motivo de petición</label><textarea placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={{ ...S.taf(ff === "re", 84), minHeight: 84 }} /></div>
               <CollapsibleSection title="Antecedentes clínicos" isOpen={showClinicalHistory} onToggle={() => setShowClinicalHistory(v => !v)} P={P}>
                 <MultiEntryGroup entries={ctx.clinicalHistory} onChange={v => setCtx({ ...ctx, clinicalHistory: v })} label="Antecedentes clínicos" singularLabel="Antecedente" placeholder="Patologías, cirugías, tratamientos..." P={P} ff={ff} setFf={setFf} fieldKey="hi" />
               </CollapsibleSection>
@@ -1332,14 +1403,26 @@ export default function Page() {
         </div>
 
         <div style={S.rp}>
-          <div data-tabbar="" style={S.tb}>
-            <Tab active={rTab === "clinicalContext"} icon="🩺" label="Contexto clínico" badge={!!clinicalContext && rTab !== "clinicalContext"} onClick={() => setRTab("clinicalContext")} P={P} compact={isMobile} />
-            <Tab active={rTab === "report"} icon="📄" label="Informe" badge={!!report && rTab !== "report"} onClick={() => setRTab("report")} P={P} compact={isMobile} />
-            <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" badge={!!analysis && rTab !== "analysis"} onClick={() => setRTab("analysis")} P={P} compact={isMobile} />
-            <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} compact={isMobile} />
-            <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" badge={!!justification && rTab !== "justification"} onClick={() => setRTab("justification")} P={P} compact={isMobile} />
-            <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" badge={!!diffDiag && rTab !== "diffDiag"} onClick={() => setRTab("diffDiag")} P={P} compact={isMobile} />
-            <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} compact={isMobile} />
+          <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
+            <button onClick={() => scrollRightTabs(-220)} style={S.tabNavBtn} title="Ver pestañas anteriores">◀</button>
+            <div data-tabbar="" ref={rightTabbarRef} style={{ ...S.tb, borderBottom: "none", flex: 1 }}>
+              {rightTabsConfig.map(t => (
+                <Tab
+                  key={t.key}
+                  active={rTab === t.key}
+                  icon={t.icon}
+                  label={t.label}
+                  status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
+                  onClick={() => openRightTab(t.key)}
+                  onRun={t.run}
+                  canRun={t.canRun}
+                  isRunning={t.loading}
+                  P={P}
+                  compact={isMobile}
+                />
+              ))}
+            </div>
+            <button onClick={() => scrollRightTabs(220)} style={S.tabNavBtn} title="Ver pestañas siguientes">▶</button>
           </div>
 
           {rTab === "clinicalContext" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
