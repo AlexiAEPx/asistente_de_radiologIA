@@ -945,6 +945,12 @@ export default function Page() {
     if (reportEditorRef.current) reportEditorRef.current.innerHTML = report;
     setEditingReport(false);
   };
+  const runEditorCommand = (command, value) => {
+    if (!reportEditorRef.current) return;
+    reportEditorRef.current.focus();
+    document.execCommand(command, false, value);
+    setReportDraft(reportEditorRef.current.innerHTML);
+  };
   const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setEditingReport(false); setReportDraft(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
@@ -1270,13 +1276,24 @@ export default function Page() {
             <div className="rpt-content" style={S.rc}><style>{`
 .rpt-content [style*="border-top:1px solid #eee"],.rpt-content [style*="border-top:2px solid #888"]{border-top-color:transparent!important}
 .rpt-content [style*="border-bottom:1px solid #ccc"]{border-bottom-color:transparent!important}
-.rpt-content-editor{min-height:100%;outline:none;border:1px dashed ${P.goldBorder};border-radius:10px;padding:14px;background:${isDark ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.55)'}}
+.rpt-content-editor-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.rpt-content-editor{min-height:calc(100% - 44px);outline:none;border:1px dashed ${P.goldBorder};border-radius:10px;padding:14px;background:${isDark ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.55)'}}
 ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#333"]{color:inherit!important}
 .rpt-content p[style*="color:#555"],.rpt-content p[style*="color:#666"]{color:${P.text3}!important}
 .rpt-content p[style*="color:#444"]{color:${P.text2}!important}
 .rpt-content span[style*="color:#444"]{color:#aaa!important}` : ''}
 `}</style>{report ? (editingReport
-              ? <div ref={reportEditorRef} className="rpt-content-editor" contentEditable suppressContentEditableWarning onInput={e => setReportDraft(e.currentTarget.innerHTML)} dangerouslySetInnerHTML={{ __html: reportDraft }} />
+              ? <>
+                <div className="rpt-content-editor-toolbar">
+                  <button onClick={() => runEditorCommand("bold")} style={{ ...S.cb("s"), background: "#334155", color: "#fff" }}>Negrita</button>
+                  <button onClick={() => runEditorCommand("italic")} style={{ ...S.cb("s"), background: "#475569", color: "#fff" }}>Cursiva</button>
+                  <button onClick={() => runEditorCommand("foreColor", "#CC0000")} style={{ ...S.cb("s"), background: "#CC0000", color: "#fff" }}>Grave</button>
+                  <button onClick={() => runEditorCommand("foreColor", "#D2691E")} style={{ ...S.cb("s"), background: "#D2691E", color: "#fff" }}>Leve</button>
+                  <button onClick={() => runEditorCommand("foreColor", "#2E8B57")} style={{ ...S.cb("s"), background: "#2E8B57", color: "#fff" }}>Normal vinculado</button>
+                  <button onClick={() => runEditorCommand("foreColor", isDark ? "#aaa" : "#444")} style={{ ...S.cb("s"), background: isDark ? "#666" : "#444", color: "#fff" }}>Relleno</button>
+                </div>
+                <div ref={reportEditorRef} className="rpt-content-editor" contentEditable suppressContentEditableWarning onInput={e => setReportDraft(e.currentTarget.innerHTML)} dangerouslySetInnerHTML={{ __html: reportDraft }} />
+              </>
               : <div dangerouslySetInnerHTML={{ __html: report }} />)
               : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
             {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal vinculado"], [isDark ? "#aaa" : "#444", "Relleno"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
