@@ -547,19 +547,30 @@ function LoadingDots({ text }) {
   );
 }
 
-function Tab({ active, icon, label, badge, onClick, P, compact }) {
+function Tab({ active, icon, label, status, onClick, onAiClick, aiDisabled, P, compact }) {
+  const statusStyle = status === "fresh"
+    ? { bg: "#22c55e", text: "✓", title: "Rellenado y leído" }
+    : status === "new"
+      ? { bg: "#f59e0b", text: "●", title: "Rellenado y pendiente de leer" }
+      : null;
   return (
-    <button onClick={onClick} style={{
-      display: "flex", alignItems: "center", gap: compact ? 3 : 5, padding: compact ? "7px 8px" : "9px 13px",
-      background: active ? P.goldBgActive : "transparent",
-      border: "none", borderBottom: active ? "2px solid " + P.gold : "2px solid transparent",
-      color: active ? P.gold : P.text3, fontSize: compact ? 11 : 13, fontWeight: active ? 600 : 400,
-      cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap", fontFamily: "inherit",
-      flexShrink: 0,
-    }}>
-      <span>{icon}</span><span>{label}</span>
-      {badge && <span style={{ width: 6, height: 6, borderRadius: "50%", background: P.gold }} />}
-    </button>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+      <button onClick={onClick} style={{
+        display: "flex", alignItems: "center", gap: compact ? 3 : 5, padding: compact ? "7px 8px" : "9px 13px",
+        background: active ? P.goldBgActive : "transparent",
+        border: "none", borderBottom: active ? "2px solid " + P.gold : "2px solid transparent",
+        color: active ? P.gold : P.text3, fontSize: compact ? 11 : 13, fontWeight: active ? 600 : 400,
+        cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap", fontFamily: "inherit",
+        flexShrink: 0,
+      }}>
+        <span>{icon}</span><span>{label}</span>
+        {statusStyle && <span title={statusStyle.title} style={{ width: 14, height: 14, borderRadius: "50%", background: statusStyle.bg, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700 }}>{statusStyle.text}</span>}
+      </button>
+      {onAiClick && <button onClick={onAiClick} disabled={aiDisabled} title="Rellenar con IA" style={{
+        border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, borderRadius: 6,
+        padding: compact ? "3px 5px" : "4px 7px", fontSize: compact ? 10 : 11, cursor: aiDisabled ? "default" : "pointer", fontFamily: "inherit", opacity: aiDisabled ? 0.55 : 1,
+      }}>✨</button>}
+    </div>
   );
 }
 
@@ -732,6 +743,8 @@ export default function Page() {
   const [ldDiffDiag, setLdDiffDiag] = useState(false);
   const [mindMap, setMindMap] = useState("");
   const [ldMindMap, setLdMindMap] = useState(false);
+  const [tabVersion, setTabVersion] = useState({ report: 0, analysis: 0, keyIdeas: 0, justification: 0, diffDiag: 0, mindMap: 0 });
+  const [tabSeenVersion, setTabSeenVersion] = useState({ report: 0, analysis: 0, keyIdeas: 0, justification: 0, diffDiag: 0, mindMap: 0 });
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
@@ -809,6 +822,15 @@ export default function Page() {
   const cEndRef = useRef(null);
   const fInpRef = useRef(null);
   const cInpRef = useRef(null);
+  const rTabBarRef = useRef(null);
+
+  const bumpTabVersion = (tab) => setTabVersion(prev => ({ ...prev, [tab]: prev[tab] + 1 }));
+
+  useEffect(() => {
+    if (["report", "analysis", "keyIdeas", "justification", "diffDiag", "mindMap"].includes(rTab)) {
+      setTabSeenVersion(prev => ({ ...prev, [rTab]: tabVersion[rTab] }));
+    }
+  }, [rTab, tabVersion]);
 
   useEffect(() => { fEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [fMsgs, ldReport]);
   useEffect(() => { cEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [cMsgs, ldChat]);
@@ -876,17 +898,17 @@ export default function Page() {
     setErr(""); const um = { role: "user", content: t }; const nm = [...fMsgs, um];
     setFMsgs(nm); setFInput(""); setLdReport(true); setRTab("report");
     if (isMobile) setMobilePanel("right");
-    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), nm)); setFMsgs(p => [...p, { role: "assistant", content: h }]); setReport(h); setCtxSnap(JSON.stringify(ctx)); saveToHistory(h, ctx); }
+    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), nm)); setFMsgs(p => [...p, { role: "assistant", content: h }]); setReport(h); bumpTabVersion("report"); setCtxSnap(JSON.stringify(ctx)); saveToHistory(h, ctx); }
     catch (e) { setErr("Error informe: " + e.message); } setLdReport(false);
   };
   const regenReport = async () => {
     if (!fMsgs.length || ldReport) return; setLdReport(true); setErr(""); setRTab("report");
-    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), fMsgs)); setReport(h); }
+    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), fMsgs)); setReport(h); bumpTabVersion("report"); }
     catch (e) { setErr("Error regenerar: " + e.message); } setLdReport(false);
   };
   const genAnalysis = async () => {
     if (!report || ldAnalysis) return; setLdAnalysis(true); setErr(""); setRTab("analysis");
-    try { setAnalysis(clean(await callAPI(ANALYSIS_SYS(ctx, report), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }]))); }
+    try { setAnalysis(clean(await callAPI(ANALYSIS_SYS(ctx, report), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }]))); bumpTabVersion("analysis"); }
     catch (e) { setErr("Error análisis: " + e.message); } setLdAnalysis(false);
   };
   const sendChat = async () => {
@@ -901,28 +923,57 @@ export default function Page() {
   };
   const genKeyIdeas = async () => {
     if (!report || ldKeyIdeas) return; setLdKeyIdeas(true); setErr(""); setRTab("keyIdeas");
-    try { setKeyIdeas(clean(await callAPI(KEY_IDEAS_SYS(ctx, report, analysis), [{ role: "user", content: "Genera las 10 ideas clave de este caso radiológico." }]))); }
+    try { setKeyIdeas(clean(await callAPI(KEY_IDEAS_SYS(ctx, report, analysis), [{ role: "user", content: "Genera las 10 ideas clave de este caso radiológico." }]))); bumpTabVersion("keyIdeas"); }
     catch (e) { setErr("Error ideas clave: " + e.message); } setLdKeyIdeas(false);
   };
   const genJustification = async () => {
     if (!report || ldJustification) return; setLdJustification(true); setErr(""); setRTab("justification");
-    try { setJustification(clean(await callAPI(JUSTIFICATION_SYS(ctx, report), [{ role: "user", content: "Analiza la justificación de esta prueba radiológica." }]))); }
+    try { setJustification(clean(await callAPI(JUSTIFICATION_SYS(ctx, report), [{ role: "user", content: "Analiza la justificación de esta prueba radiológica." }]))); bumpTabVersion("justification"); }
     catch (e) { setErr("Error justificación: " + e.message); } setLdJustification(false);
   };
   const genDiffDiag = async () => {
     if (!report || ldDiffDiag) return; setLdDiffDiag(true); setErr(""); setRTab("diffDiag");
-    try { setDiffDiag(clean(await callAPI(DIFF_DIAG_SYS(ctx, report, analysis), [{ role: "user", content: "Genera el diagnóstico diferencial con código semáforo para este caso." }]))); }
+    try { setDiffDiag(clean(await callAPI(DIFF_DIAG_SYS(ctx, report, analysis), [{ role: "user", content: "Genera el diagnóstico diferencial con código semáforo para este caso." }]))); bumpTabVersion("diffDiag"); }
     catch (e) { setErr("Error diagnóstico diferencial: " + e.message); } setLdDiffDiag(false);
   };
   const genMindMap = async () => {
     if (!report || ldMindMap) return; setLdMindMap(true); setErr(""); setRTab("mindMap");
-    try { setMindMap(clean(await callAPI(MIND_MAP_SYS(ctx, report, analysis), [{ role: "user", content: "Genera un mapa mental visual completo de este caso radiológico." }]))); }
+    try { setMindMap(clean(await callAPI(MIND_MAP_SYS(ctx, report, analysis), [{ role: "user", content: "Genera un mapa mental visual completo de este caso radiológico." }]))); bumpTabVersion("mindMap"); }
     catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
+  };
+
+  const tabAiActions = {
+    report: regenReport,
+    analysis: genAnalysis,
+    keyIdeas: genKeyIdeas,
+    justification: genJustification,
+    diffDiag: genDiffDiag,
+    mindMap: genMindMap,
+  };
+
+  const tabAiDisabled = {
+    report: !fMsgs.length || ldReport,
+    analysis: !report || ldAnalysis,
+    keyIdeas: !report || ldKeyIdeas,
+    justification: !report || ldJustification,
+    diffDiag: !report || ldDiffDiag,
+    mindMap: !report || ldMindMap,
+  };
+
+  const tabStatus = (tab) => {
+    if (tabVersion[tab] === 0) return null;
+    return tabSeenVersion[tab] < tabVersion[tab] ? "new" : "fresh";
+  };
+
+  const scrollTabs = (dir) => {
+    if (!rTabBarRef.current) return;
+    const amount = Math.max(180, rTabBarRef.current.clientWidth * 0.6);
+    rTabBarRef.current.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
   };
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setTabVersion({ report: 0, analysis: 0, keyIdeas: 0, justification: 0, diffDiag: 0, mindMap: 0 }); setTabSeenVersion({ report: 0, analysis: 0, keyIdeas: 0, justification: 0, diffDiag: 0, mindMap: 0 }); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
   const S = {
@@ -947,7 +998,7 @@ export default function Page() {
     rp: isMobile
       ? { display: mobilePanel === "right" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)" }
       : { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 },
-    tb: { display: "flex", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" },
+    tb: { display: "flex", alignItems: "center", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth" },
     cs: { flex: 1, overflowY: "auto", padding: isMobile ? "12px 10px" : "14px 16px" },
     fg: { marginBottom: 14 },
     lb: { display: "block", fontSize: 11, fontWeight: 600, color: P.text3, marginBottom: 4, letterSpacing: 0.3, textTransform: "uppercase" },
@@ -1122,8 +1173,8 @@ export default function Page() {
         <div style={S.lp}>
           <div data-tabbar="" style={S.tb}>
             <Tab active={lTab === "context"} icon="📋" label="Qué sabemos" onClick={() => setLTab("context")} P={P} compact={isMobile} />
-            <Tab active={lTab === "findings"} icon="🔎" label="Qué vemos" badge={!!report && lTab !== "findings"} onClick={() => setLTab("findings")} P={P} compact={isMobile} />
-            <Tab active={lTab === "chat"} icon="💬" label="Chat" badge={cMsgs.length > 0 && lTab !== "chat"} onClick={() => setLTab("chat")} P={P} compact={isMobile} />
+            <Tab active={lTab === "findings"} icon="🔎" label="Qué vemos" status={report && lTab !== "findings" ? "new" : null} onClick={() => setLTab("findings")} P={P} compact={isMobile} />
+            <Tab active={lTab === "chat"} icon="💬" label="Chat" status={cMsgs.length > 0 && lTab !== "chat" ? "new" : null} onClick={() => setLTab("chat")} P={P} compact={isMobile} />
           </div>
           {lTab === "context" ? (
             <div style={S.cs}>
@@ -1213,14 +1264,18 @@ export default function Page() {
         </div>
 
         <div style={S.rp}>
-          <div data-tabbar="" style={S.tb}>
-            <Tab active={rTab === "clinicalContext"} icon="🩺" label="Contexto clínico" badge={!!clinicalContext && rTab !== "clinicalContext"} onClick={() => setRTab("clinicalContext")} P={P} compact={isMobile} />
-            <Tab active={rTab === "report"} icon="📄" label="Informe" badge={!!report && rTab !== "report"} onClick={() => setRTab("report")} P={P} compact={isMobile} />
-            <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" badge={!!analysis && rTab !== "analysis"} onClick={() => setRTab("analysis")} P={P} compact={isMobile} />
-            <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} compact={isMobile} />
-            <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" badge={!!justification && rTab !== "justification"} onClick={() => setRTab("justification")} P={P} compact={isMobile} />
-            <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" badge={!!diffDiag && rTab !== "diffDiag"} onClick={() => setRTab("diffDiag")} P={P} compact={isMobile} />
-            <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} compact={isMobile} />
+          <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0 }}>
+            <button onClick={() => scrollTabs("left")} title="Ver pestañas anteriores" style={{ border: "none", background: "transparent", color: P.gold, cursor: "pointer", padding: isMobile ? "8px 7px" : "10px 8px", fontSize: 14, flexShrink: 0 }}>◀</button>
+            <div ref={rTabBarRef} data-tabbar="" style={{ ...S.tb, borderBottom: "none", flex: 1 }}>
+              <Tab active={rTab === "clinicalContext"} icon="🩺" label="Contexto clínico" onClick={() => setRTab("clinicalContext")} P={P} compact={isMobile} />
+              <Tab active={rTab === "report"} icon="📄" label="Informe" status={tabStatus("report")} onClick={() => setRTab("report")} onAiClick={tabAiActions.report} aiDisabled={tabAiDisabled.report} P={P} compact={isMobile} />
+              <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" status={tabStatus("analysis")} onClick={() => setRTab("analysis")} onAiClick={tabAiActions.analysis} aiDisabled={tabAiDisabled.analysis} P={P} compact={isMobile} />
+              <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" status={tabStatus("keyIdeas")} onClick={() => setRTab("keyIdeas")} onAiClick={tabAiActions.keyIdeas} aiDisabled={tabAiDisabled.keyIdeas} P={P} compact={isMobile} />
+              <Tab active={rTab === "justification"} icon="❓" label="¿Justificada?" status={tabStatus("justification")} onClick={() => setRTab("justification")} onAiClick={tabAiActions.justification} aiDisabled={tabAiDisabled.justification} P={P} compact={isMobile} />
+              <Tab active={rTab === "diffDiag"} icon="🚦" label="Diferencial" status={tabStatus("diffDiag")} onClick={() => setRTab("diffDiag")} onAiClick={tabAiActions.diffDiag} aiDisabled={tabAiDisabled.diffDiag} P={P} compact={isMobile} />
+              <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" status={tabStatus("mindMap")} onClick={() => setRTab("mindMap")} onAiClick={tabAiActions.mindMap} aiDisabled={tabAiDisabled.mindMap} P={P} compact={isMobile} />
+            </div>
+            <button onClick={() => scrollTabs("right")} title="Ver pestañas siguientes" style={{ border: "none", background: "transparent", color: P.gold, cursor: "pointer", padding: isMobile ? "8px 7px" : "10px 8px", fontSize: 14, flexShrink: 0 }}>▶</button>
           </div>
 
           {rTab === "clinicalContext" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
