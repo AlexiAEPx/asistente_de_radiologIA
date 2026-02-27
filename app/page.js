@@ -1478,7 +1478,18 @@ export default function Page() {
         <div style={S.rp}>
           <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
             <button onClick={() => scrollRightTabs(-220)} style={S.tabNavBtn} title="Ver pestañas anteriores">◀</button>
-            <div data-tabbar="" ref={rightTabbarRef} style={{ ...S.tb, borderBottom: "none", flex: 1 }}>
+            <div
+              data-tabbar=""
+              ref={rightTabbarRef}
+              style={{
+                ...S.tb,
+                borderBottom: "none",
+                flex: 1,
+                overflowX: "hidden",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+              }}
+            >
               {rightTabsConfig.map(t => (
                 <Tab
                   key={t.key}
