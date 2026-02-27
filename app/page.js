@@ -684,8 +684,26 @@ function MultiEntryGroup({ entries, onChange, label, singularLabel, placeholder,
   );
 }
 
+function CollapsibleSection({ title, subtitle, isOpen, onToggle, P, children }) {
+  return (
+    <div style={{ marginBottom: 14, borderRadius: 10, border: "1px solid " + P.goldBorder, background: P.goldBg }}>
+      <button onClick={onToggle} style={{
+        width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer",
+        color: P.text, padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "inherit",
+      }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: P.gold }}>{title}</div>
+          {subtitle && <div style={{ fontSize: 11, color: P.text3, marginTop: 2 }}>{subtitle}</div>}
+        </div>
+        <span style={{ fontSize: 14, color: P.gold }}>{isOpen ? "▲" : "▼"}</span>
+      </button>
+      {isOpen && <div style={{ padding: "0 12px 10px" }}>{children}</div>}
+    </div>
+  );
+}
+
 export default function Page() {
-  const emptyCtx = { age: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: [{ text: "", collapsed: false }], priorRadiology: [{ text: "", collapsed: false }], clinicalReports: [{ text: "", collapsed: false }], freeText: "" };
+  const emptyCtx = { age: "", birthYear: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: [{ text: "", collapsed: false }], priorRadiology: [{ text: "", collapsed: false }], clinicalReports: [{ text: "", collapsed: false }], freeText: "" };
 
   const [themePref, setThemePref] = useState("auto");
   const [systemDark, setSystemDark] = useState(false);
@@ -736,12 +754,23 @@ export default function Page() {
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
   const [showCodeDrop, setShowCodeDrop] = useState(false);
+  const [showTotum, setShowTotum] = useState(false);
+  const [showClinicalHistory, setShowClinicalHistory] = useState(false);
+  const [showPriorRadiology, setShowPriorRadiology] = useState(false);
+  const [showClinicalReports, setShowClinicalReports] = useState(false);
   const [ff, setFf] = useState("");
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
 
   const clinicalContext = useMemo(() => buildClinicalContextHtml(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
+
+  const getAgeFromBirthYear = (yearValue) => {
+    const year = Number(yearValue);
+    const currentYear = new Date().getFullYear();
+    if (!Number.isInteger(year) || year < 1900 || year > currentYear) return "";
+    return String(currentYear - year);
+  };
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -922,7 +951,29 @@ export default function Page() {
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
+  const clearAll = () => {
+    setCtx(emptyCtx);
+    setFMsgs([]);
+    setCMsgs([]);
+    setReport("");
+    setAnalysis("");
+    setKeyIdeas("");
+    setJustification("");
+    setDiffDiag("");
+    setMindMap("");
+    setFInput("");
+    setCInput("");
+    setErr("");
+    setCtxSnap("");
+    setLTab("context");
+    setRTab("report");
+    setShowCodeDrop(false);
+    setShowTotum(false);
+    setShowClinicalHistory(false);
+    setShowPriorRadiology(false);
+    setShowClinicalReports(false);
+    setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
+  };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
   const S = {
@@ -1127,19 +1178,49 @@ export default function Page() {
           </div>
           {lTab === "context" ? (
             <div style={S.cs}>
-              <div style={{ marginBottom: 18, padding: "14px 16px", borderRadius: 12, border: "1px dashed " + P.goldBorder, background: P.goldBg }}>
-                <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: P.gold, marginBottom: 2 }}>🍲 El Totum Revolutum</label>
-                <span style={{ display: "block", fontSize: 11, color: P.text3, marginBottom: 8, lineHeight: 1.4 }}>No te compliques: pega aquí todo el churro (edad, informes, lo que sea) y nosotros nos apañamos</span>
-                <textarea placeholder="Pega aquí todo lo que tengas: edad, sexo, antecedentes, informes previos, informes clínicos, motivo... todo revuelto, sin orden ni concierto." value={ctx.freeText} onChange={e => setCtx({ ...ctx, freeText: e.target.value })} onFocus={() => setFf("ft")} onBlur={() => setFf("")} style={{ ...S.taf(ff === "ft", 120), borderStyle: "dashed" }} />
-              </div>
+              <CollapsibleSection
+                title="🍲 El Totum Revolutum"
+                subtitle="No te compliques: pega aquí todo el churro (edad, informes, lo que sea) y nosotros nos apañamos"
+                isOpen={showTotum}
+                onToggle={() => setShowTotum(v => !v)}
+                P={P}
+              >
+                <textarea placeholder="Pega aquí todo lo que tengas: edad, sexo, antecedentes, informes previos, informes clínicos, motivo... todo revuelto, sin orden ni concierto." value={ctx.freeText} onChange={e => setCtx({ ...ctx, freeText: e.target.value })} onFocus={() => setFf("ft")} onBlur={() => setFf("")} style={{ ...S.taf(ff === "ft", 120), borderStyle: "dashed", marginBottom: 0 }} />
+              </CollapsibleSection>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                 <div style={{ flex: 1, height: 1, background: P.goldBorder }} />
                 <span style={{ fontSize: 10, color: P.text4, textTransform: "uppercase", letterSpacing: 1.5, whiteSpace: "nowrap" }}>o si eres buen@ y quieres separar</span>
                 <div style={{ flex: 1, height: 1, background: P.goldBorder }} />
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <div style={{ ...S.fg, flex: 1 }}><label style={S.lb}>Edad</label><input type="number" placeholder="—" value={ctx.age} onChange={e => setCtx({ ...ctx, age: e.target.value })} onFocus={() => setFf("ag")} onBlur={() => setFf("")} style={S.inp(ff === "ag")} /></div>
-                <div style={{ ...S.fg, flex: 1 }}><label style={S.lb}>Género</label><select value={ctx.gender} onChange={e => setCtx({ ...ctx, gender: e.target.value })} style={S.sel}><option value="" style={S.selOpt}>—</option><option value="Hombre" style={S.selOpt}>Hombre</option><option value="Mujer" style={S.selOpt}>Mujer</option></select></div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ ...S.fg, flex: 1, minWidth: 120 }}>
+                  <label style={S.lb}>Edad</label>
+                  <input
+                    type="number"
+                    placeholder="—"
+                    value={ctx.age}
+                    onChange={e => setCtx({ ...ctx, age: e.target.value, birthYear: "" })}
+                    onFocus={() => setFf("ag")}
+                    onBlur={() => setFf("")}
+                    style={S.inp(ff === "ag")}
+                  />
+                </div>
+                <div style={{ ...S.fg, flex: 1, minWidth: 120 }}>
+                  <label style={S.lb}>Año de nacimiento</label>
+                  <input
+                    type="number"
+                    placeholder="Ej: 1984"
+                    value={ctx.birthYear || ""}
+                    onChange={e => {
+                      const birthYear = e.target.value;
+                      setCtx({ ...ctx, birthYear, age: getAgeFromBirthYear(birthYear) });
+                    }}
+                    onFocus={() => setFf("by")}
+                    onBlur={() => setFf("")}
+                    style={S.inp(ff === "by")}
+                  />
+                </div>
+                <div style={{ ...S.fg, flex: 1, minWidth: 120 }}><label style={S.lb}>Género</label><select value={ctx.gender} onChange={e => setCtx({ ...ctx, gender: e.target.value })} style={S.sel}><option value="" style={S.selOpt}>—</option><option value="Hombre" style={S.selOpt}>Hombre</option><option value="Mujer" style={S.selOpt}>Mujer</option></select></div>
               </div>
               <div style={S.fg}><label style={S.lb}>Estudio solicitado</label><input type="text" placeholder="Ej: TC tórax con CIV, RM lumbar..." value={ctx.studyRequested} onChange={e => setCtx({ ...ctx, studyRequested: e.target.value })} onFocus={() => setFf("st")} onBlur={() => setFf("")} style={S.inp(ff === "st")} /></div>
               <div style={S.fg}><label style={S.lb}>Prioridad</label>
@@ -1158,9 +1239,15 @@ export default function Page() {
                   </div>
                 </div></div>
               <div style={S.fg}><label style={S.lb}>Motivo de petición</label><input type="text" placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={S.inp(ff === "re")} /></div>
-              <MultiEntryGroup entries={ctx.clinicalHistory} onChange={v => setCtx({ ...ctx, clinicalHistory: v })} label="Antecedentes clínicos" singularLabel="Antecedente" placeholder="Patologías, cirugías, tratamientos..." P={P} ff={ff} setFf={setFf} fieldKey="hi" />
-              <MultiEntryGroup entries={ctx.priorRadiology} onChange={v => setCtx({ ...ctx, priorRadiology: v })} label="Informes radiológicos previos" singularLabel="Informe radiológico" placeholder="Pegar informe anterior..." P={P} ff={ff} setFf={setFf} fieldKey="ra" bigH={220} />
-              <MultiEntryGroup entries={ctx.clinicalReports} onChange={v => setCtx({ ...ctx, clinicalReports: v })} label="Informes clínicos" singularLabel="Informe clínico" placeholder="Altas, consultas, analíticas..." P={P} ff={ff} setFf={setFf} fieldKey="cl" bigH={220} />
+              <CollapsibleSection title="Antecedentes clínicos" isOpen={showClinicalHistory} onToggle={() => setShowClinicalHistory(v => !v)} P={P}>
+                <MultiEntryGroup entries={ctx.clinicalHistory} onChange={v => setCtx({ ...ctx, clinicalHistory: v })} label="Antecedentes clínicos" singularLabel="Antecedente" placeholder="Patologías, cirugías, tratamientos..." P={P} ff={ff} setFf={setFf} fieldKey="hi" />
+              </CollapsibleSection>
+              <CollapsibleSection title="Informes radiológicos previos" isOpen={showPriorRadiology} onToggle={() => setShowPriorRadiology(v => !v)} P={P}>
+                <MultiEntryGroup entries={ctx.priorRadiology} onChange={v => setCtx({ ...ctx, priorRadiology: v })} label="Informes radiológicos previos" singularLabel="Informe radiológico" placeholder="Pegar informe anterior..." P={P} ff={ff} setFf={setFf} fieldKey="ra" bigH={220} />
+              </CollapsibleSection>
+              <CollapsibleSection title="Informes clínicos" isOpen={showClinicalReports} onToggle={() => setShowClinicalReports(v => !v)} P={P}>
+                <MultiEntryGroup entries={ctx.clinicalReports} onChange={v => setCtx({ ...ctx, clinicalReports: v })} label="Informes clínicos" singularLabel="Informe clínico" placeholder="Altas, consultas, analíticas..." P={P} ff={ff} setFf={setFf} fieldKey="cl" bigH={220} />
+              </CollapsibleSection>
             </div>
           ) : lTab === "findings" ? (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
