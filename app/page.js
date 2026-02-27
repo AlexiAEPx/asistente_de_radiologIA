@@ -18,6 +18,7 @@ const palette = (dark) => dark ? {
   bg: "#0e0e18", bg2: "#111120", bg3: "#1a1a2e",
   text: "#e0ddd5", text2: "#aaa", text3: "#777", text4: "#555",
   gold: "#c4973c", goldDim: "rgba(196,151,60,0.5)", goldBorder: "rgba(196,151,60,0.2)", goldBg: "rgba(196,151,60,0.08)", goldBgActive: "rgba(196,151,60,0.12)", goldBorderFocus: "rgba(196,151,60,0.5)",
+  tabShellBg: "linear-gradient(135deg,rgba(196,151,60,0.12),rgba(255,255,255,0.02))", tabShellBorder: "rgba(196,151,60,0.22)", tabBtnBg: "rgba(255,255,255,0.02)", tabBtnBgActive: "linear-gradient(135deg,rgba(196,151,60,0.24),rgba(196,151,60,0.1))", tabBtnBorder: "rgba(196,151,60,0.1)",
   inputBg: "rgba(255,255,255,0.04)", inputBgFocus: "rgba(255,255,255,0.07)", inputBorder: "rgba(196,151,60,0.2)",
   bubbleUser: "linear-gradient(135deg,#c4973c,#a07830)", bubbleAsst: "rgba(255,255,255,0.06)", bubbleAsstBorder: "rgba(255,255,255,0.08)",
   reportBg: "linear-gradient(180deg,#1e1e2a,#1a1a28)", reportHeader: "#161622", reportHeaderBorder: "rgba(196,151,60,0.15)", reportTitleColor: "#c4973c",
@@ -45,6 +46,7 @@ const palette = (dark) => dark ? {
   bg: "#f5f3ef", bg2: "#faf8f5", bg3: "#fafaf8",
   text: "#1a1a1a", text2: "#555", text3: "#888", text4: "#aaa",
   gold: "#96722a", goldDim: "rgba(150,114,42,0.5)", goldBorder: "rgba(150,114,42,0.2)", goldBg: "rgba(150,114,42,0.06)", goldBgActive: "rgba(150,114,42,0.12)", goldBorderFocus: "rgba(150,114,42,0.45)",
+  tabShellBg: "linear-gradient(135deg,rgba(150,114,42,0.1),rgba(255,255,255,0.65))", tabShellBorder: "rgba(150,114,42,0.28)", tabBtnBg: "rgba(255,255,255,0.55)", tabBtnBgActive: "linear-gradient(135deg,rgba(150,114,42,0.2),rgba(150,114,42,0.08))", tabBtnBorder: "rgba(150,114,42,0.22)",
   inputBg: "#f7f5f0", inputBgFocus: "#faf7f0", inputBorder: "rgba(150,114,42,0.25)",
   bubbleUser: "linear-gradient(135deg,#96722a,#7a5c1f)", bubbleAsst: "#f0ece4", bubbleAsstBorder: "#e0dbd0",
   reportBg: "linear-gradient(180deg,#fdfbf7,#f9f6f0)", reportHeader: "#f5f1ea", reportHeaderBorder: "#e8e4dc", reportTitleColor: "#8a7a60",
@@ -566,12 +568,13 @@ function LoadingDots({ text }) {
 function Tab({ active, icon, label, status, onClick, onRun, canRun, isRunning, P, compact }) {
   return (
     <button onClick={onClick} style={{
-      display: "flex", alignItems: "center", gap: compact ? 3 : 5, padding: compact ? "7px 8px" : "9px 13px",
-      background: active ? P.goldBgActive : "transparent",
-      border: "none", borderBottom: active ? "2px solid " + P.gold : "2px solid transparent",
-      color: active ? P.gold : P.text3, fontSize: compact ? 11 : 13, fontWeight: active ? 600 : 400,
+      display: "flex", alignItems: "center", gap: compact ? 3 : 5, padding: compact ? "7px 9px" : "9px 14px",
+      background: active ? P.tabBtnBgActive : P.tabBtnBg,
+      border: "1px solid " + (active ? P.tabShellBorder : P.tabBtnBorder),
+      borderBottom: active ? "1px solid " + P.gold : "1px solid " + P.tabBtnBorder,
+      color: active ? P.gold : P.text3, fontSize: compact ? 11 : 13, fontWeight: active ? 700 : 500,
       cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap", fontFamily: "inherit",
-      flexShrink: 0,
+      flexShrink: 0, borderRadius: 10, boxShadow: active ? "0 8px 18px rgba(0,0,0,0.12)" : "none",
     }}>
       <span>{icon}</span><span>{label}</span>
       {status && <span title={status === "unread" ? "Nuevo pendiente de revisar" : "Ya revisado"} style={{ width: 8, height: 8, borderRadius: "50%", background: status === "unread" ? "#22c55e" : "#fff", border: "1px solid " + (status === "unread" ? "#16a34a" : "rgba(255,255,255,0.6)") }} />}
@@ -1168,8 +1171,8 @@ export default function Page() {
     rp: isMobile
       ? { display: mobilePanel === "right" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)" }
       : { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 },
-    tb: { display: "flex", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth" },
-    tabNavBtn: { width: 28, border: "none", borderBottom: "1px solid " + P.goldBorder, background: P.bg2, color: P.gold, cursor: "pointer", fontSize: 15, flexShrink: 0 },
+    tb: { display: "flex", borderBottom: "1px solid " + P.tabShellBorder, background: P.tabShellBg, flexShrink: 0, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth", gap: 6, padding: isMobile ? "6px 6px 5px" : "8px 8px 7px", backdropFilter: "blur(10px)" },
+    tabNavBtn: { width: 30, border: "1px solid " + P.tabShellBorder, borderRadius: 8, margin: isMobile ? "6px 2px 5px" : "8px 3px 7px", background: P.tabBtnBg, color: P.gold, cursor: "pointer", fontSize: 14, flexShrink: 0 },
     cs: { flex: 1, overflowY: "auto", padding: isMobile ? "12px 10px" : "14px 16px" },
     fg: { marginBottom: 14 },
     lb: { display: "block", fontSize: 11, fontWeight: 600, color: P.text3, marginBottom: 4, letterSpacing: 0.3, textTransform: "uppercase" },
