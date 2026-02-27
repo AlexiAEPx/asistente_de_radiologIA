@@ -143,14 +143,6 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
     .replace(/\s+/g, " ")
     .trim();
 
-  const inferStudy = () => {
-    if (nonEmpty(c.studyRequested)) return nonEmpty(c.studyRequested);
-    const source = [motivo, libre].join(" ");
-    const modalities = ["TC", "TAC", "RM", "RX", "Ecografía", "PET", "AngioTC"];
-    const found = modalities.find(mod => new RegExp(`\\b${mod}\\b`, "i").test(source));
-    return found ? `Solicitud compatible con ${found}` : "No especificada";
-  };
-
   const reasonLines = motivo
     ? motivo.split(/\n+/).map(sanitizeReason).filter(Boolean)
     : [];
@@ -161,21 +153,47 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   if (prevRad.length) clinicalFocus.push(`Comparativa potencial con estudios previos: ${prevRad.join("; ")}.`);
   if (informes.length) clinicalFocus.push(`Información clínica complementaria aportada: ${informes.join("; ")}.`);
 
+  const normalizedGender = inferGender();
+  const normalizedAge = inferAge();
+  const introBits = [
+    normalizedGender !== "No especificado" ? normalizedGender.toLowerCase() : "",
+    normalizedAge !== "No especificada" ? normalizedAge : "",
+    nonEmpty(c.studyRequested),
+  ].filter(Boolean);
+
+  const briefSummary = [
+    reasonSummary !== "No especificado" ? reasonSummary : "",
+    clinicalFocus.length ? clinicalFocus.join(" ") : "",
+  ].filter(Boolean).join(" ");
+
   return {
     hasAny: true,
     originalRequestText: motivo,
     structuredText: [
-      "Contexto clínico: contexto",
-      "",
-      "RESUMEN CLÍNICO ESTRUCTURADO (procesado)",
-      `- Género: ${inferGender()}`,
-      `- Edad: ${inferAge()}`,
-      `- Exploración solicitada: ${inferStudy()}`,
-      `- Motivo de petición (síntesis IA): ${reasonSummary}`,
-      clinicalFocus.length ? `- Claves para el radiólogo: ${clinicalFocus.join(" ")}` : "- Claves para el radiólogo: Sin datos clínicos adicionales relevantes.",
+      `CONTEXTO CLÍNICO: ${introBits.length ? introBits.join(", ") + "." : ""}`,
+      briefSummary,
+      !briefSummary ? "Información clínica pendiente de completar." : "",
     ].join("\n"),
   };
 };
+
+const CLINICAL_CONTEXT_SYS = `Eres un asistente médico especializado en redactar contexto clínico para informes radiológicos.
+
+OBJETIVO
+- Reescribe y corrige el texto clínico recibido para que quede breve, profesional, claro y útil para el radiólogo.
+- Debe quedar más sintético y esquemático, sin perder datos importantes.
+
+ESTILO OBLIGATORIO
+- Español médico formal, impecable en gramática y ortografía.
+- Evita MAYÚSCULAS innecesarias.
+- No incluyas etiquetas tipo "género:", "edad:", "procesado" o "síntesis de IA".
+- Si existe sexo y edad, intégralos de forma natural: "mujer, 46 años" o "varón, 72 años".
+- Nunca inventes datos.
+
+FORMATO DE SALIDA (OBLIGATORIO)
+- Devuelve SOLO texto plano, sin markdown.
+- Empieza exactamente por: "CONTEXTO CLÍNICO: "
+- Tras los dos puntos, redacta 1 párrafo breve (máx. 4 frases), muy condensado y clínicamente relevante.`;
 
 const REPORT_SYS = (c, isDark) => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
 ${buildCtxBlock(c)}
@@ -786,6 +804,7 @@ export default function Page() {
   const [ldReport, setLdReport] = useState(false);
   const [ldAnalysis, setLdAnalysis] = useState(false);
   const [ldChat, setLdChat] = useState(false);
+  const [ldClinicalContext, setLdClinicalContext] = useState(false);
   const [keyIdeas, setKeyIdeas] = useState("");
   const [ldKeyIdeas, setLdKeyIdeas] = useState(false);
   const [justification, setJustification] = useState("");
@@ -1071,6 +1090,23 @@ export default function Page() {
     catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
   };
 
+  const improveClinicalContext = async () => {
+    if (!clinicalContextData.hasAny || ldClinicalContext) return;
+    setErr("");
+    setLdClinicalContext(true);
+    try {
+      const sourcePayload = [
+        `Motivo de petición: ${clinicalContextData.originalRequestText || "No especificado"}`,
+        `Borrador actual: ${clinicalContextDraft || "No disponible"}`,
+      ].join("\n");
+      const improved = clean(await callAPI(CLINICAL_CONTEXT_SYS, [{ role: "user", content: sourcePayload }], 800));
+      setClinicalContextDraft(improved);
+    } catch (e) {
+      setErr("Error contexto clínico: " + e.message);
+    }
+    setLdClinicalContext(false);
+  };
+
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpClinicalContext = async () => { if (!clinicalContextDraft.trim()) return; await navigator.clipboard.writeText(clinicalContextDraft); setCopied("clinical"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
@@ -1112,6 +1148,7 @@ export default function Page() {
     setShowPriorRadiology(false);
     setShowClinicalReports(false);
     setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
+    setLdClinicalContext(false);
     setTabStatus({ clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
   };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
@@ -1502,19 +1539,28 @@ export default function Page() {
             <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}>
               <span style={{ ...S.rt, color: P.chatTitleColor }}>Contexto clínico</span>
               {!!clinicalContextData.hasAny && (
-                <button
-                  onClick={cpClinicalContext}
-                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: copied === "clinical" ? "#22c55e" : P.chatSendBg, color: "#fff" }}
-                >
-                  {copied === "clinical" ? "✓ Copiado" : "📋 Copiar y pegar"}
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={improveClinicalContext}
+                    disabled={ldClinicalContext}
+                    style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: ldClinicalContext ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#2563eb,#1d4ed8)", color: "#fff", opacity: ldClinicalContext ? 0.75 : 1 }}
+                  >
+                    {ldClinicalContext ? "⏳ Corrigiendo..." : "✨ Corregir con IA"}
+                  </button>
+                  <button
+                    onClick={cpClinicalContext}
+                    style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: copied === "clinical" ? "#22c55e" : P.chatSendBg, color: "#fff" }}
+                  >
+                    {copied === "clinical" ? "✓ Copiado" : "📋 Copiar y pegar"}
+                  </button>
+                </div>
               )}
             </div>
             <div style={{ ...S.rc, background: P.chatPanelBg }}>
               {clinicalContextData.hasAny
                 ? <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ padding: "14px 16px", background: P.inputBgFocus, border: "1px solid " + P.chatInputBorderFocus, borderRadius: 10 }}>
-                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.chatTitleColor }}>Contexto clínico procesado por IA (editable)</div>
+                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.chatTitleColor }}>Contexto clínico (editable)</div>
                       <textarea
                         value={clinicalContextDraft}
                         onChange={(e) => setClinicalContextDraft(e.target.value)}
@@ -1522,11 +1568,11 @@ export default function Page() {
                       />
                     </div>
                     <div style={{ padding: "14px 16px", background: P.inputBg, border: "1px solid " + P.inputBorder, borderRadius: 10 }}>
-                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.text2 }}>Motivo de petición original (sin procesar)</div>
+                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.text2 }}>Motivo de petición original</div>
                       <div style={{ whiteSpace: "pre-wrap", color: P.text }}>{clinicalContextData.originalRequestText || "Sin motivo de petición pegado todavía."}</div>
                     </div>
                   </div>
-                : <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Contexto clínico pendiente</div><div style={S.phD}>Cuando aportes datos del paciente, aquí verás un resumen estructurado editable y el motivo de petición original.</div></div>}
+                : <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Contexto clínico pendiente</div><div style={S.phD}>Cuando aportes datos del paciente, aquí podrás generar y editar un contexto clínico corregido junto al motivo de petición original.</div></div>}
             </div>
           </div>}
 
