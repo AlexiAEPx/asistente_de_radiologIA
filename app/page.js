@@ -115,47 +115,56 @@ const buildClinicalContextHtml = (c, fMsgs, cMsgs) => {
   if (!hasAny) return "";
 
   const redFlags = [];
-  if (c.priority && c.priority !== "programado") redFlags.push("Prioridad marcada como " + c.priority.replaceAll("_", " ").toUpperCase());
-  if (/ictus|stroke|déficit focal|afasia|hemiparesia/i.test([motivo, libre, ...chatPrevio].join(" "))) redFlags.push("Sospecha neurológica aguda (valorar ventana terapéutica)");
+  if (c.priority && c.priority !== "programado") redFlags.push("Prioridad: " + c.priority.replaceAll("_", " ").toUpperCase());
+  if (/ictus|stroke|déficit focal|afasia|hemiparesia/i.test([motivo, libre, ...chatPrevio].join(" "))) redFlags.push("Sospecha neurológica aguda");
 
-  const puntos = [
-    ["Motivo clínico principal", motivo || "No especificado"],
-    ["Antecedentes relevantes", antecedentes.length ? antecedentes.join("; ") : "No aportados"],
-    ["Evolución temporal", "No claramente especificada en los datos aportados"],
-    ["Pruebas/estudios previos", prevRad.length ? prevRad.join("; ") : "No aportados"],
-    ["Informes clínicos previos", informes.length ? informes.join("; ") : "No aportados"],
-    ["Red flags / urgencia", redFlags.length ? redFlags.join("; ") : "Sin alertas explícitas en la información recibida"],
-  ];
+  const esquema = [];
+  if (motivo) esquema.push(`Motivo clínico: ${motivo}`);
+  if (antecedentes.length) esquema.push(`Antecedentes relevantes: ${antecedentes.join("; ")}`);
+  if (prevRad.length) esquema.push(`Pruebas/estudios previos: ${prevRad.join("; ")}`);
+  if (informes.length) esquema.push(`Informes clínicos previos: ${informes.join("; ")}`);
+  if (redFlags.length) esquema.push(`Alertas clínicas: ${redFlags.join("; ")}`);
+  if (libre) esquema.push(`Datos clínicos adicionales: ${libre}`);
+  if (chatPrevio.length) esquema.push(`Aportado en chat clínico: ${chatPrevio.join("; ")}`);
+  if (hallazgosAportados.length) esquema.push(`Aportado en chat de informe: ${hallazgosAportados.join("; ")}`);
 
-  const vacios = [];
-  if (!motivo) vacios.push("Falta concretar el motivo clínico principal");
-  if (!antecedentes.length) vacios.push("Sin antecedentes clínicos relevantes detallados");
-  if (!prevRad.length) vacios.push("Sin informes radiológicos previos específicos");
-  if (!informes.length) vacios.push("Sin informes clínicos complementarios");
+  const proseParts = [];
+  if (motivo) proseParts.push(`Estudio solicitado por ${esc(motivo.toLowerCase())}.`);
+  if (antecedentes.length) proseParts.push(`Antecedentes relevantes: ${esc(antecedentes.join("; "))}.`);
+  if (prevRad.length) proseParts.push(`Constan estudios radiológicos previos: ${esc(prevRad.join("; "))}.`);
+  if (informes.length) proseParts.push(`También se aportan informes clínicos: ${esc(informes.join("; "))}.`);
+  if (redFlags.length) proseParts.push(`Alertas clínicas identificadas: ${esc(redFlags.join("; "))}.`);
+  if (libre) proseParts.push(`Información clínica adicional aportada: ${esc(libre)}.`);
+  if (chatPrevio.length) proseParts.push(`En el chat clínico se añade: ${esc(chatPrevio.join("; "))}.`);
+  if (hallazgosAportados.length) proseParts.push(`En el chat de informe se menciona: ${esc(hallazgosAportados.join("; "))}.`);
 
-  const prosa = [
-    motivo ? `El contexto sugiere que el estudio se solicita por ${esc(motivo.toLowerCase())}.` : "No se ha especificado con claridad el motivo clínico de la petición.",
-    antecedentes.length ? `Como antecedentes, se aporta: ${esc(antecedentes.join("; "))}.` : "No constan antecedentes clínicos relevantes aportados.",
-    prevRad.length || informes.length ? `En la documentación previa figuran ${esc(prevRad.length ? "informes radiológicos" : "")} ${esc(prevRad.length && informes.length ? "e" : "")} ${esc(informes.length ? "informes clínicos" : "")}.` : "No se han aportado informes previos de apoyo.",
-    vacios.length ? `Para afinar la interpretación radiológica conviene completar: ${esc(vacios.join("; "))}.` : "La información previa es razonablemente completa para orientar el análisis radiológico inicial.",
-  ].join(" ");
+  const faltantes = [];
+  if (!motivo) faltantes.push("Concretar motivo clínico principal");
+  if (!antecedentes.length) faltantes.push("Antecedentes clínicos relevantes");
+  if (!prevRad.length) faltantes.push("Informes radiológicos previos");
+  if (!informes.length) faltantes.push("Informes clínicos complementarios");
+
+  const textoEsquematico = esquema.length ? esquema.join("\n") : "Sin información clínica estructurable con los datos actuales.";
+  const textoProsa = proseParts.length ? proseParts.join(" ") : "Sin información clínica narrativa con los datos actuales.";
 
   return `<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
-    <div style="margin-bottom:12px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;">
-      <p style="margin:0;font-size:12px;color:#1d4ed8;font-weight:700;text-transform:uppercase;">Versión 1 · Estructurada y esquemática</p>
+    <div style="margin-bottom:10px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;">
+      <p style="margin:0;font-size:12px;color:#1d4ed8;font-weight:700;text-transform:uppercase;">Texto clínico · Formato esquemático</p>
     </div>
-    <div style="padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;">
-      <ul style="margin:0;padding-left:20px;color:#334155;">
-        ${puntos.map(([k,v]) => `<li><strong>${esc(k)}:</strong> ${esc(v)}</li>`).join("")}
-        <li><strong>Vacíos de información:</strong> ${esc(vacios.length ? vacios.join("; ") : "No se detectan vacíos críticos en los datos aportados")}</li>
-      </ul>
+    <div style="padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;color:#1e293b;white-space:pre-wrap;">
+      <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;text-transform:uppercase;color:#334155;">TEXTO CLÍNICO</p>
+      <p style="margin:0;">${esc(textoEsquematico)}</p>
     </div>
-    <div style="margin-bottom:12px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;">
-      <p style="margin:0;font-size:12px;color:#166534;font-weight:700;text-transform:uppercase;">Versión 2 · Prosa clínica ligera</p>
+    <div style="margin-bottom:10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;">
+      <p style="margin:0;font-size:12px;color:#166534;font-weight:700;text-transform:uppercase;">Respuesta en prosa</p>
     </div>
     <div style="padding:14px 16px;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;color:#374151;">
-      <p style="margin:0;">${prosa}</p>
+      <p style="margin:0;">${textoProsa}</p>
     </div>
+    ${faltantes.length ? `<div style="margin-top:14px;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;color:#9a3412;">
+      <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;text-transform:uppercase;">Recomendaciones / datos ausentes (separado)</p>
+      <p style="margin:0;">${esc(faltantes.join("; "))}</p>
+    </div>` : ""}
   </div>`;
 };
 
