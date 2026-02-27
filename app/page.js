@@ -103,6 +103,10 @@ const esc = (v = "") => String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;
 const buildClinicalContextHtml = (c, fMsgs, cMsgs) => {
   const nonEmpty = (v) => (v || "").trim();
   const take = (arr) => (arr || []).map(e => nonEmpty(e.text)).filter(Boolean);
+  const cleanLabel = (text) => text
+    .replace(/^[-•\s]*/g, "")
+    .replace(/^(justificaci[oó]n cl[ií]nica|motivo de petici[oó]n|sospecha diagn[oó]stica)\s*:\s*/i, "")
+    .trim();
   const motivo = nonEmpty(c.reason);
   const antecedentes = take(c.clinicalHistory);
   const prevRad = take(c.priorRadiology);
@@ -118,15 +122,24 @@ const buildClinicalContextHtml = (c, fMsgs, cMsgs) => {
   if (c.priority && c.priority !== "programado") redFlags.push("Prioridad: " + c.priority.replaceAll("_", " ").toUpperCase());
   if (/ictus|stroke|déficit focal|afasia|hemiparesia/i.test([motivo, libre, ...chatPrevio].join(" "))) redFlags.push("Sospecha neurológica aguda");
 
-  const esquema = [];
-  if (motivo) esquema.push(`Motivo clínico: ${motivo}`);
-  if (antecedentes.length) esquema.push(`Antecedentes relevantes: ${antecedentes.join("; ")}`);
-  if (prevRad.length) esquema.push(`Pruebas/estudios previos: ${prevRad.join("; ")}`);
-  if (informes.length) esquema.push(`Informes clínicos previos: ${informes.join("; ")}`);
-  if (redFlags.length) esquema.push(`Alertas clínicas: ${redFlags.join("; ")}`);
-  if (libre) esquema.push(`Datos clínicos adicionales: ${libre}`);
-  if (chatPrevio.length) esquema.push(`Aportado en chat clínico: ${chatPrevio.join("; ")}`);
-  if (hallazgosAportados.length) esquema.push(`Aportado en chat de informe: ${hallazgosAportados.join("; ")}`);
+  const contextoBullet = [];
+  if (c.age || c.gender) {
+    const edadGenero = [c.age ? `${c.age} años` : "Edad no especificada", c.gender || "género no especificado"]
+      .filter(Boolean)
+      .join(", ");
+    contextoBullet.push(edadGenero);
+  }
+  if (motivo) {
+    const splitMotivo = motivo.split(/\n|\s+-\s+/).map(cleanLabel).filter(Boolean);
+    contextoBullet.push(...splitMotivo);
+  }
+  if (antecedentes.length) contextoBullet.push(`Antecedentes relevantes: ${antecedentes.join("; ")}`);
+  if (prevRad.length) contextoBullet.push(`Pruebas/estudios previos: ${prevRad.join("; ")}`);
+  if (informes.length) contextoBullet.push(`Informes clínicos previos: ${informes.join("; ")}`);
+  if (redFlags.length) contextoBullet.push(`Alertas clínicas: ${redFlags.join("; ")}`);
+  if (libre) contextoBullet.push(`Datos clínicos adicionales: ${libre}`);
+  if (chatPrevio.length) contextoBullet.push(`Aportado en chat clínico: ${chatPrevio.join("; ")}`);
+  if (hallazgosAportados.length) contextoBullet.push(`Aportado en chat de informe: ${hallazgosAportados.join("; ")}`);
 
   const proseParts = [];
   if (motivo) proseParts.push(`Estudio solicitado por ${esc(motivo.toLowerCase())}.`);
@@ -144,7 +157,9 @@ const buildClinicalContextHtml = (c, fMsgs, cMsgs) => {
   if (!prevRad.length) faltantes.push("Informes radiológicos previos");
   if (!informes.length) faltantes.push("Informes clínicos complementarios");
 
-  const textoEsquematico = esquema.length ? esquema.join("\n") : "Sin información clínica estructurable con los datos actuales.";
+  const textoEsquematico = contextoBullet.length
+    ? `CONTEXTO CLÍNICO:\n${contextoBullet.map(item => `- ${item}`).join("\n")}`
+    : "Sin información clínica estructurable con los datos actuales.";
   const textoProsa = proseParts.length ? proseParts.join(" ") : "Sin información clínica narrativa con los datos actuales.";
 
   return `<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
@@ -152,7 +167,7 @@ const buildClinicalContextHtml = (c, fMsgs, cMsgs) => {
       <p style="margin:0;font-size:12px;color:#1d4ed8;font-weight:700;text-transform:uppercase;">Texto clínico · Formato esquemático</p>
     </div>
     <div style="padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;color:#1e293b;white-space:pre-wrap;">
-      <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;text-transform:uppercase;color:#334155;">TEXTO CLÍNICO</p>
+      <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;text-transform:uppercase;color:#334155;">RESUMEN ESTRUCTURADO</p>
       <p style="margin:0;">${esc(textoEsquematico)}</p>
     </div>
     <div style="margin-bottom:10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;">
@@ -855,6 +870,31 @@ export default function Page() {
     }
   };
 
+  const buildCaseSnapshot = () => ({
+    ctx,
+    fMsgs,
+    cMsgs,
+    report,
+    analysis,
+    keyIdeas,
+    justification,
+    diffDiag,
+    mindMap,
+    editedReport,
+    isEditingReport,
+    fInput,
+    cInput,
+    lTab,
+    rTab,
+    model,
+    spending,
+    tabStatus,
+    showClinicalHistory,
+    showPriorRadiology,
+    showClinicalReports,
+    showTotum,
+  });
+
   const saveToHistory = (reportHtml, caseCtx) => {
     const now = new Date();
     const entry = {
@@ -863,8 +903,39 @@ export default function Page() {
       time: now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }),
       study: caseCtx.studyRequested || "Estudio no especificado",
       summary: extractSummary(reportHtml),
+      snapshot: { ...buildCaseSnapshot(), report: reportHtml },
     };
     setHistory(prev => [entry, ...prev]);
+  };
+
+  const loadHistoryEntry = (entry) => {
+    if (!entry?.snapshot) return;
+    const snap = entry.snapshot;
+    setCtx(snap.ctx || emptyCtx);
+    setCtxSnap(JSON.stringify(snap.ctx || emptyCtx));
+    setFMsgs(snap.fMsgs || []);
+    setCMsgs(snap.cMsgs || []);
+    setReport(snap.report || "");
+    setAnalysis(snap.analysis || "");
+    setKeyIdeas(snap.keyIdeas || "");
+    setJustification(snap.justification || "");
+    setDiffDiag(snap.diffDiag || "");
+    setMindMap(snap.mindMap || "");
+    setEditedReport(snap.editedReport || snap.report || "");
+    setIsEditingReport(!!snap.isEditingReport);
+    setFInput(snap.fInput || "");
+    setCInput(snap.cInput || "");
+    setLTab(snap.lTab || "context");
+    setRTab(snap.rTab || "report");
+    setModel(snap.model || MODELS[1].id);
+    setSpending(snap.spending || { totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
+    setTabStatus(snap.tabStatus || { clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
+    setShowClinicalHistory(!!snap.showClinicalHistory);
+    setShowPriorRadiology(!!snap.showPriorRadiology);
+    setShowClinicalReports(!!snap.showClinicalReports);
+    setShowTotum(!!snap.showTotum);
+    setErr("");
+    setShowHistory(false);
   };
 
   const deleteHistoryEntry = (id) => {
@@ -1205,8 +1276,9 @@ export default function Page() {
                         <div key={entry.id} style={{
                           padding: "10px 12px", borderRadius: 8,
                           background: P.historyCardBg, border: "1px solid " + P.historyCardBorder,
-                          transition: "background 0.2s",
+                          transition: "background 0.2s", cursor: entry.snapshot ? "pointer" : "default",
                         }}
+                          onClick={() => loadHistoryEntry(entry)}
                           onMouseEnter={e => e.currentTarget.style.background = P.historyCardHover}
                           onMouseLeave={e => e.currentTarget.style.background = P.historyCardBg}
                         >
@@ -1215,7 +1287,7 @@ export default function Page() {
                               <span style={{ fontSize: 11, fontWeight: 600, color: P.historyDate }}>{entry.date}</span>
                               <span style={{ fontSize: 10, color: P.historyEmpty }}>{entry.time}</span>
                             </div>
-                            <button onClick={() => deleteHistoryEntry(entry.id)} title="Eliminar" style={{
+                            <button onClick={(e) => { e.stopPropagation(); deleteHistoryEntry(entry.id); }} title="Eliminar" style={{
                               background: "none", border: "none", cursor: "pointer", color: P.historyDeleteBtn,
                               fontSize: 13, padding: "1px 3px", lineHeight: 1, transition: "color 0.2s",
                             }}
@@ -1225,6 +1297,7 @@ export default function Page() {
                           </div>
                           <div style={{ fontSize: 12, fontWeight: 600, color: P.historyStudy, marginBottom: 4 }}>{entry.study}</div>
                           <div style={{ fontSize: 11, color: P.historySummary, lineHeight: 1.4 }}>{entry.summary}</div>
+                          {entry.snapshot && <div style={{ marginTop: 6, fontSize: 10, color: P.historyEmpty }}>Abrir caso guardado</div>}
                         </div>
                       ))}
                     </div>
