@@ -235,10 +235,10 @@ Piensa SIEMPRE: ¿este hallazgo normal es relevante para el diagnóstico, estadi
 </div>
 
 ## REGLAS
-- Separación visual amplia entre regiones
-- Frases LARGAS y detalladas
+- Separación visual clara entre regiones
+- Redacción BREVE, precisa y esquemática (evitar frases innecesariamente largas)
 - Conclusión: SOLO patología, negrita, mayor→menor gravedad
-- TODAS las estructuras evaluables con normalidad detallada
+- Incluir TODAS las estructuras evaluables, con normalidad solo cuando aporte valor clínico
 - Si informes previos: COMPARAR hallazgos
 - Código ictus→"CÓDIGO ICTUS"+ASPECTS | Código trauma→"CÓDIGO TRAUMA" body-TC | Código TEP→"CÓDIGO TEP" AngioTC pulmonar, ratio VD/VI | Código médula→"CÓDIGO MÉDULA" RM urgente | Código hemostasis→"CÓDIGO HEMOSTASIS" AngioTC, sangrado activo | Urgente→"URGENTE"
 - Medidas con plano entre paréntesis | Escoliosis párrafo separado
@@ -1098,8 +1098,15 @@ export default function Page() {
       const sourcePayload = [
         `Motivo de petición: ${clinicalContextData.originalRequestText || "No especificado"}`,
         `Borrador actual: ${clinicalContextDraft || "No disponible"}`,
+        `Edad: ${ctx.age || "No especificada"}`,
+        `Sexo: ${ctx.gender || "No especificado"}`,
+        `Estudio solicitado: ${ctx.studyRequested || "No especificado"}`,
+        `Antecedentes: ${joinEntries(ctx.clinicalHistory) || "No aportados"}`,
+        `Informes radiológicos previos: ${joinEntries(ctx.priorRadiology) || "No aportados"}`,
+        `Informes clínicos: ${joinEntries(ctx.clinicalReports) || "No aportados"}`,
+        `Texto libre: ${ctx.freeText || "No aportado"}`,
       ].join("\n");
-      const improved = clean(await callAPI(CLINICAL_CONTEXT_SYS, [{ role: "user", content: sourcePayload }], 800));
+      const improved = clean(await callAPI(CLINICAL_CONTEXT_SYS, [{ role: "user", content: sourcePayload }], 1000));
       setClinicalContextDraft(improved);
     } catch (e) {
       setErr("Error contexto clínico: " + e.message);
