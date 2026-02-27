@@ -732,6 +732,7 @@ export default function Page() {
   const [ldDiffDiag, setLdDiffDiag] = useState(false);
   const [mindMap, setMindMap] = useState("");
   const [ldMindMap, setLdMindMap] = useState(false);
+  const [clinicalContext, setClinicalContext] = useState("");
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
@@ -740,8 +741,6 @@ export default function Page() {
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
-
-  const clinicalContext = useMemo(() => buildClinicalContextHtml(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -919,10 +918,14 @@ export default function Page() {
     try { setMindMap(clean(await callAPI(MIND_MAP_SYS(ctx, report, analysis), [{ role: "user", content: "Genera un mapa mental visual completo de este caso radiológico." }]))); }
     catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
   };
+  const genClinicalContext = () => {
+    setClinicalContext(buildClinicalContextHtml(ctx, fMsgs, cMsgs));
+    setRTab("clinicalContext");
+  };
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setClinicalContext(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
   const S = {
@@ -1121,8 +1124,8 @@ export default function Page() {
       <div ref={mainRef} style={S.main}>
         <div style={S.lp}>
           <div data-tabbar="" style={S.tb}>
-            <Tab active={lTab === "context"} icon="📋" label="Qué sabemos" onClick={() => setLTab("context")} P={P} compact={isMobile} />
-            <Tab active={lTab === "findings"} icon="🔎" label="Qué vemos" badge={!!report && lTab !== "findings"} onClick={() => setLTab("findings")} P={P} compact={isMobile} />
+            <Tab active={lTab === "context"} icon="📋" label="Qué sabemos antes" onClick={() => setLTab("context")} P={P} compact={isMobile} />
+            <Tab active={lTab === "findings"} icon="🔎" label="Qué vemos ahora" badge={!!report && lTab !== "findings"} onClick={() => setLTab("findings")} P={P} compact={isMobile} />
             <Tab active={lTab === "chat"} icon="💬" label="Chat" badge={cMsgs.length > 0 && lTab !== "chat"} onClick={() => setLTab("chat")} P={P} compact={isMobile} />
           </div>
           {lTab === "context" ? (
@@ -1223,12 +1226,18 @@ export default function Page() {
             <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} compact={isMobile} />
           </div>
 
+          <div style={{ ...S.ia, padding: "8px 12px", borderBottom: "1px solid " + P.goldBorder, borderTop: "none" }}>
+            <button onClick={genClinicalContext} style={{ ...S.aBtn, width: "100%", padding: "10px 14px", fontSize: 14, background: "linear-gradient(135deg,#0ea5e9,#0284c7)" }}>
+              🩺 Ver contexto clínico ahora
+            </button>
+          </div>
+
           {rTab === "clinicalContext" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Contexto clínico</span></div>
             <div style={{ ...S.rc, background: P.chatPanelBg }}>
               {clinicalContext
                 ? <div dangerouslySetInnerHTML={{ __html: clinicalContext }} />
-                : <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Contexto clínico pendiente</div><div style={S.phD}>Cuando aportes datos del paciente, aquí verás un resumen en formato esquemático y otra versión en prosa.</div></div>}
+                : <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Contexto clínico bajo demanda</div><div style={S.phD}>Cuando hayas rellenado los campos, pulsa "Ver contexto clínico ahora" para generarlo.</div></div>}
             </div>
           </div>}
 
