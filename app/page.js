@@ -100,13 +100,9 @@ const buildCtxBlock = (c) => {
 
 const esc = (v = "") => String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-const buildClinicalContextHtml = (c, fMsgs, cMsgs) => {
+const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const nonEmpty = (v) => (v || "").trim();
   const take = (arr) => (arr || []).map(e => nonEmpty(e.text)).filter(Boolean);
-  const cleanLabel = (text) => text
-    .replace(/^[-•\s]*/g, "")
-    .replace(/^(justificaci[oó]n cl[ií]nica|motivo de petici[oó]n|sospecha diagn[oó]stica)\s*:\s*/i, "")
-    .trim();
   const motivo = nonEmpty(c.reason);
   const antecedentes = take(c.clinicalHistory);
   const prevRad = take(c.priorRadiology);
@@ -115,72 +111,68 @@ const buildClinicalContextHtml = (c, fMsgs, cMsgs) => {
   const chatPrevio = (cMsgs || []).filter(m => m.role === "user").map(m => nonEmpty(m.content)).filter(Boolean);
   const hallazgosAportados = (fMsgs || []).filter(m => m.role === "user").map(m => nonEmpty(m.content)).filter(Boolean);
 
-  const hasAny = [motivo, ...antecedentes, ...prevRad, ...informes, libre, ...chatPrevio, ...hallazgosAportados].some(Boolean);
-  if (!hasAny) return "";
-
-  const redFlags = [];
-  if (c.priority && c.priority !== "programado") redFlags.push("Prioridad: " + c.priority.replaceAll("_", " ").toUpperCase());
-  if (/ictus|stroke|déficit focal|afasia|hemiparesia/i.test([motivo, libre, ...chatPrevio].join(" "))) redFlags.push("Sospecha neurológica aguda");
-
-  const contextoBullet = [];
-  if (c.age || c.gender) {
-    const edadGenero = [c.age ? `${c.age} años` : "Edad no especificada", c.gender || "género no especificado"]
-      .filter(Boolean)
-      .join(", ");
-    contextoBullet.push(edadGenero);
+  const textoOrigen = [motivo, libre, ...chatPrevio, ...hallazgosAportados].join(" ").trim();
+  const hasAny = [motivo, c.age, c.gender, c.studyRequested, ...antecedentes, ...prevRad, ...informes, libre, ...chatPrevio, ...hallazgosAportados].some(Boolean);
+  if (!hasAny) {
+    return {
+      hasAny: false,
+      structuredText: "",
+      originalRequestText: "",
+    };
   }
-  if (motivo) {
-    const splitMotivo = motivo.split(/\n|\s+-\s+/).map(cleanLabel).filter(Boolean);
-    contextoBullet.push(...splitMotivo);
-  }
-  if (antecedentes.length) contextoBullet.push(`Antecedentes relevantes: ${antecedentes.join("; ")}`);
-  if (prevRad.length) contextoBullet.push(`Pruebas/estudios previos: ${prevRad.join("; ")}`);
-  if (informes.length) contextoBullet.push(`Informes clínicos previos: ${informes.join("; ")}`);
-  if (redFlags.length) contextoBullet.push(`Alertas clínicas: ${redFlags.join("; ")}`);
-  if (libre) contextoBullet.push(`Datos clínicos adicionales: ${libre}`);
-  if (chatPrevio.length) contextoBullet.push(`Aportado en chat clínico: ${chatPrevio.join("; ")}`);
-  if (hallazgosAportados.length) contextoBullet.push(`Aportado en chat de informe: ${hallazgosAportados.join("; ")}`);
 
-  const proseParts = [];
-  if (motivo) proseParts.push(`Estudio solicitado por ${esc(motivo.toLowerCase())}.`);
-  if (antecedentes.length) proseParts.push(`Antecedentes relevantes: ${esc(antecedentes.join("; "))}.`);
-  if (prevRad.length) proseParts.push(`Constan estudios radiológicos previos: ${esc(prevRad.join("; "))}.`);
-  if (informes.length) proseParts.push(`También se aportan informes clínicos: ${esc(informes.join("; "))}.`);
-  if (redFlags.length) proseParts.push(`Alertas clínicas identificadas: ${esc(redFlags.join("; "))}.`);
-  if (libre) proseParts.push(`Información clínica adicional aportada: ${esc(libre)}.`);
-  if (chatPrevio.length) proseParts.push(`En el chat clínico se añade: ${esc(chatPrevio.join("; "))}.`);
-  if (hallazgosAportados.length) proseParts.push(`En el chat de informe se menciona: ${esc(hallazgosAportados.join("; "))}.`);
+  const inferGender = () => {
+    if (c.gender) return c.gender;
+    if (/\bpaciente\s+var[oó]n\b|\bvar[oó]n\b|\bhombre\b|\bmasculino\b/i.test(textoOrigen)) return "Masculino";
+    if (/\bpaciente\s+mujer\b|\bmujer\b|\bfemenina\b|\bfemenino\b/i.test(textoOrigen)) return "Femenino";
+    return "No especificado";
+  };
 
-  const faltantes = [];
-  if (!motivo) faltantes.push("Concretar motivo clínico principal");
-  if (!antecedentes.length) faltantes.push("Antecedentes clínicos relevantes");
-  if (!prevRad.length) faltantes.push("Informes radiológicos previos");
-  if (!informes.length) faltantes.push("Informes clínicos complementarios");
+  const inferAge = () => {
+    if (c.age) return `${c.age} años`;
+    const match = textoOrigen.match(/\b(\d{1,3})\s*a[nñ]os\b/i);
+    if (match) return `${match[1]} años`;
+    return "No especificada";
+  };
 
-  const textoEsquematico = contextoBullet.length
-    ? `CONTEXTO CLÍNICO:\n${contextoBullet.map(item => `- ${item}`).join("\n")}`
-    : "Sin información clínica estructurable con los datos actuales.";
-  const textoProsa = proseParts.length ? proseParts.join(" ") : "Sin información clínica narrativa con los datos actuales.";
+  const sanitizeReason = (text) => text
+    .replace(/^[-•\s]*/g, "")
+    .replace(/^(justificaci[oó]n cl[ií]nica|motivo de petici[oó]n|sospecha diagn[oó]stica)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  return `<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
-    <div style="margin-bottom:10px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;">
-      <p style="margin:0;font-size:12px;color:#1d4ed8;font-weight:700;text-transform:uppercase;">Texto clínico · Formato esquemático</p>
-    </div>
-    <div style="padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;color:#1e293b;white-space:pre-wrap;">
-      <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;text-transform:uppercase;color:#334155;">RESUMEN ESTRUCTURADO</p>
-      <p style="margin:0;">${esc(textoEsquematico)}</p>
-    </div>
-    <div style="margin-bottom:10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;">
-      <p style="margin:0;font-size:12px;color:#166534;font-weight:700;text-transform:uppercase;">Respuesta en prosa</p>
-    </div>
-    <div style="padding:14px 16px;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;color:#374151;">
-      <p style="margin:0;">${textoProsa}</p>
-    </div>
-    ${faltantes.length ? `<div style="margin-top:14px;padding:14px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;color:#9a3412;">
-      <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;text-transform:uppercase;">Recomendaciones / datos ausentes (separado)</p>
-      <p style="margin:0;">${esc(faltantes.join("; "))}</p>
-    </div>` : ""}
-  </div>`;
+  const inferStudy = () => {
+    if (nonEmpty(c.studyRequested)) return nonEmpty(c.studyRequested);
+    const source = [motivo, libre].join(" ");
+    const modalities = ["TC", "TAC", "RM", "RX", "Ecografía", "PET", "AngioTC"];
+    const found = modalities.find(mod => new RegExp(`\\b${mod}\\b`, "i").test(source));
+    return found ? `Solicitud compatible con ${found}` : "No especificada";
+  };
+
+  const reasonLines = motivo
+    ? motivo.split(/\n+/).map(sanitizeReason).filter(Boolean)
+    : [];
+  const reasonSummary = reasonLines.length ? reasonLines.join(". ") : "No especificado";
+
+  const clinicalFocus = [];
+  if (antecedentes.length) clinicalFocus.push(`Antecedentes útiles para interpretación: ${antecedentes.join("; ")}.`);
+  if (prevRad.length) clinicalFocus.push(`Comparativa potencial con estudios previos: ${prevRad.join("; ")}.`);
+  if (informes.length) clinicalFocus.push(`Información clínica complementaria aportada: ${informes.join("; ")}.`);
+
+  return {
+    hasAny: true,
+    originalRequestText: motivo,
+    structuredText: [
+      "Contexto clínico: contexto",
+      "",
+      "RESUMEN CLÍNICO ESTRUCTURADO (procesado)",
+      `- Género: ${inferGender()}`,
+      `- Edad: ${inferAge()}`,
+      `- Exploración solicitada: ${inferStudy()}`,
+      `- Motivo de petición (síntesis IA): ${reasonSummary}`,
+      clinicalFocus.length ? `- Claves para el radiólogo: ${clinicalFocus.join(" ")}` : "- Claves para el radiólogo: Sin datos clínicos adicionales relevantes.",
+    ].join("\n"),
+  };
 };
 
 const REPORT_SYS = (c, isDark) => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
@@ -824,7 +816,11 @@ export default function Page() {
   });
   const rightTabbarRef = useRef(null);
 
-  const clinicalContext = useMemo(() => buildClinicalContextHtml(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
+  const clinicalContextData = useMemo(() => buildClinicalContextData(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
+  const [clinicalContextDraft, setClinicalContextDraft] = useState("");
+  useEffect(() => {
+    setClinicalContextDraft(clinicalContextData.structuredText || "");
+  }, [clinicalContextData.structuredText]);
 
 
   const getAgeFromBirthYear = (yearValue) => {
@@ -1073,6 +1069,7 @@ export default function Page() {
   };
 
   const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
+  const cpClinicalContext = async () => { if (!clinicalContextDraft.trim()) return; await navigator.clipboard.writeText(clinicalContextDraft); setCopied("clinical"); setTimeout(() => setCopied(""), 2500); };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
   const startEditReport = () => {
     setEditedReport(report);
@@ -1499,11 +1496,34 @@ export default function Page() {
           </div>
 
           {rTab === "clinicalContext" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Contexto clínico</span></div>
+            <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}>
+              <span style={{ ...S.rt, color: P.chatTitleColor }}>Contexto clínico</span>
+              {!!clinicalContextData.hasAny && (
+                <button
+                  onClick={cpClinicalContext}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: copied === "clinical" ? "#22c55e" : P.chatSendBg, color: "#fff" }}
+                >
+                  {copied === "clinical" ? "✓ Copiado" : "📋 Copiar y pegar"}
+                </button>
+              )}
+            </div>
             <div style={{ ...S.rc, background: P.chatPanelBg }}>
-              {clinicalContext
-                ? <div dangerouslySetInnerHTML={{ __html: clinicalContext }} />
-                : <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Contexto clínico pendiente</div><div style={S.phD}>Cuando aportes datos del paciente, aquí verás un resumen en formato esquemático y otra versión en prosa.</div></div>}
+              {clinicalContextData.hasAny
+                ? <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div style={{ padding: "14px 16px", background: P.inputBgFocus, border: "1px solid " + P.chatInputBorderFocus, borderRadius: 10 }}>
+                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.chatTitleColor }}>Contexto clínico procesado por IA (editable)</div>
+                      <textarea
+                        value={clinicalContextDraft}
+                        onChange={(e) => setClinicalContextDraft(e.target.value)}
+                        style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, lineHeight: 1.5, outline: "none" }}
+                      />
+                    </div>
+                    <div style={{ padding: "14px 16px", background: P.inputBg, border: "1px solid " + P.inputBorder, borderRadius: 10 }}>
+                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.text2 }}>Motivo de petición original (sin procesar)</div>
+                      <div style={{ whiteSpace: "pre-wrap", color: P.text }}>{clinicalContextData.originalRequestText || "Sin motivo de petición pegado todavía."}</div>
+                    </div>
+                  </div>
+                : <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Contexto clínico pendiente</div><div style={S.phD}>Cuando aportes datos del paciente, aquí verás un resumen estructurado editable y el motivo de petición original.</div></div>}
             </div>
           </div>}
 
