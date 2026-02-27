@@ -732,6 +732,8 @@ export default function Page() {
   const [ldDiffDiag, setLdDiffDiag] = useState(false);
   const [mindMap, setMindMap] = useState("");
   const [ldMindMap, setLdMindMap] = useState(false);
+  const [editingReport, setEditingReport] = useState(false);
+  const [reportDraft, setReportDraft] = useState("");
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
@@ -809,9 +811,13 @@ export default function Page() {
   const cEndRef = useRef(null);
   const fInpRef = useRef(null);
   const cInpRef = useRef(null);
+  const reportEditorRef = useRef(null);
 
   useEffect(() => { fEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [fMsgs, ldReport]);
   useEffect(() => { cEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [cMsgs, ldChat]);
+  useEffect(() => {
+    if (!editingReport) setReportDraft(report);
+  }, [report, editingReport]);
 
   useEffect(() => {
     const onMove = (e) => {
@@ -920,9 +926,26 @@ export default function Page() {
     catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
   };
 
-  const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
-  const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
-  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
+  const activeReport = editingReport ? reportDraft : report;
+  const cpText = async () => { if (!activeReport) return; const d = document.createElement("div"); d.innerHTML = activeReport; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
+  const cpHtml = async () => { if (!activeReport) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([activeReport], { type: "text/html" }), "text/plain": new Blob([activeReport], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(activeReport); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
+  const startEditingReport = () => {
+    setEditingReport(true);
+    setReportDraft(report);
+    requestAnimationFrame(() => reportEditorRef.current?.focus());
+  };
+  const saveEditedReport = () => {
+    const edited = reportEditorRef.current?.innerHTML ?? reportDraft;
+    setReport(edited);
+    setReportDraft(edited);
+    setEditingReport(false);
+  };
+  const cancelEditedReport = () => {
+    setReportDraft(report);
+    if (reportEditorRef.current) reportEditorRef.current.innerHTML = report;
+    setEditingReport(false);
+  };
+  const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setEditingReport(false); setReportDraft(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
   const S = {
@@ -1233,15 +1256,29 @@ export default function Page() {
           </div>}
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={S.rh}><span style={S.rt}>Informe</span>{report && <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>}</div>
+            <div style={S.rh}>
+              <span style={S.rt}>Informe</span>
+              {report && <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {!editingReport && <button onClick={startEditingReport} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#2563eb,#1d4ed8)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>✏️ Editar</button>}
+                {editingReport && <>
+                  <button onClick={saveEditedReport} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>💾 Guardar</button>
+                  <button onClick={cancelEditedReport} style={{ padding: "6px 16px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: "transparent", color: P.text2, display: "flex", alignItems: "center", gap: 6 }}>↩ Cancelar</button>
+                </>}
+                <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>
+              </div>}
+            </div>
             <div className="rpt-content" style={S.rc}><style>{`
 .rpt-content [style*="border-top:1px solid #eee"],.rpt-content [style*="border-top:2px solid #888"]{border-top-color:transparent!important}
 .rpt-content [style*="border-bottom:1px solid #ccc"]{border-bottom-color:transparent!important}
+.rpt-content-editor{min-height:100%;outline:none;border:1px dashed ${P.goldBorder};border-radius:10px;padding:14px;background:${isDark ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.55)'}}
 ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#333"]{color:inherit!important}
 .rpt-content p[style*="color:#555"],.rpt-content p[style*="color:#666"]{color:${P.text3}!important}
 .rpt-content p[style*="color:#444"]{color:${P.text2}!important}
 .rpt-content span[style*="color:#444"]{color:#aaa!important}` : ''}
-`}</style>{report ? <div dangerouslySetInnerHTML={{ __html: report }} /> : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
+`}</style>{report ? (editingReport
+              ? <div ref={reportEditorRef} className="rpt-content-editor" contentEditable suppressContentEditableWarning onInput={e => setReportDraft(e.currentTarget.innerHTML)} dangerouslySetInnerHTML={{ __html: reportDraft }} />
+              : <div dangerouslySetInnerHTML={{ __html: report }} />)
+              : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
             {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal vinculado"], [isDark ? "#aaa" : "#444", "Relleno"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
 
