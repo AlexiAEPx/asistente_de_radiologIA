@@ -82,13 +82,27 @@ const joinEntries = (arr) => {
   return items.map((e, i) => `[${i + 1}] ${e.text.trim()}`).join("\n\n");
 };
 
+const getPriorityLabel = (priority) => {
+  if (!priority || priority === "programado") return "";
+  const codeLabels = {
+    urgente: "URGENTE",
+    codigo_ictus: "CÓDIGO ICTUS",
+    codigo_trauma: "CÓDIGO TRAUMA",
+    codigo_tep: "CÓDIGO TEP",
+    codigo_medula: "CÓDIGO MÉDULA",
+    codigo_hemostasis: "CÓDIGO HEMOSTASIS",
+  };
+  return codeLabels[priority] || priority.toUpperCase();
+};
+
 const buildCtxBlock = (c) => {
   const p = [];
   if (c.freeText) p.push("Información clínica general (sin clasificar):\n" + c.freeText);
   if (c.age) p.push("Edad: " + c.age + " años");
   if (c.gender) p.push("Género: " + c.gender);
   if (c.studyRequested) p.push("Estudio solicitado: " + c.studyRequested);
-  if (c.priority && c.priority !== "programado") { const codeLabels = { urgente: "URGENTE", codigo_ictus: "CÓDIGO ICTUS", codigo_trauma: "CÓDIGO TRAUMA", codigo_tep: "CÓDIGO TEP", codigo_medula: "CÓDIGO MÉDULA", codigo_hemostasis: "CÓDIGO HEMOSTASIS" }; p.push("Prioridad: " + (codeLabels[c.priority] || c.priority.toUpperCase())); }
+  const priorityLabel = getPriorityLabel(c.priority);
+  if (priorityLabel) p.push("Prioridad: " + priorityLabel);
   if (c.reason) p.push("Motivo: " + c.reason);
   const ch = joinEntries(c.clinicalHistory);
   if (ch) p.push("Antecedentes:\n" + ch);
@@ -114,6 +128,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const hallazgosAportados = (fMsgs || []).filter(m => m.role === "user").map(m => nonEmpty(m.content)).filter(Boolean);
 
   const textoOrigen = [motivo, libre, ...chatPrevio, ...hallazgosAportados].join(" ").trim();
+  const priorityLabel = getPriorityLabel(c.priority);
   const hasAny = [motivo, c.age, c.gender, c.studyRequested, ...antecedentes, ...prevRad, ...informes, libre, ...chatPrevio, ...hallazgosAportados].some(Boolean);
   if (!hasAny) {
     return {
@@ -157,6 +172,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const reasonSummary = reasonLines.length ? reasonLines.join(". ") : "No especificado";
 
   const clinicalFocus = [];
+  if (priorityLabel) clinicalFocus.push(`Prioridad asistencial marcada: ${priorityLabel}.`);
   if (antecedentes.length) clinicalFocus.push(`Antecedentes útiles para interpretación: ${antecedentes.join("; ")}.`);
   if (prevRad.length) clinicalFocus.push(`Comparativa potencial con estudios previos: ${prevRad.join("; ")}.`);
   if (informes.length) clinicalFocus.push(`Información clínica complementaria aportada: ${informes.join("; ")}.`);
@@ -171,6 +187,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
       `- Género: ${inferGender()}`,
       `- Edad: ${inferAge()}`,
       `- Exploración solicitada: ${inferStudy()}`,
+      `- Prioridad asistencial: ${priorityLabel || "Programado"}`,
       `- Motivo de petición (síntesis IA): ${reasonSummary}`,
       clinicalFocus.length ? `- Claves para el radiólogo: ${clinicalFocus.join(" ")}` : "- Claves para el radiólogo: Sin datos clínicos adicionales relevantes.",
     ].join("\n"),
