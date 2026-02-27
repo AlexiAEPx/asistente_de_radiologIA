@@ -97,6 +97,68 @@ const buildCtxBlock = (c) => {
   return p.length ? "\n\n## CONTEXTO CLÍNICO\n" + p.join("\n\n") : "";
 };
 
+
+const esc = (v = "") => String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+const buildClinicalContextHtml = (c, fMsgs, cMsgs) => {
+  const nonEmpty = (v) => (v || "").trim();
+  const take = (arr) => (arr || []).map(e => nonEmpty(e.text)).filter(Boolean);
+  const motivo = nonEmpty(c.reason);
+  const antecedentes = take(c.clinicalHistory);
+  const prevRad = take(c.priorRadiology);
+  const informes = take(c.clinicalReports);
+  const libre = nonEmpty(c.freeText);
+  const chatPrevio = (cMsgs || []).filter(m => m.role === "user").map(m => nonEmpty(m.content)).filter(Boolean);
+  const hallazgosAportados = (fMsgs || []).filter(m => m.role === "user").map(m => nonEmpty(m.content)).filter(Boolean);
+
+  const hasAny = [motivo, ...antecedentes, ...prevRad, ...informes, libre, ...chatPrevio, ...hallazgosAportados].some(Boolean);
+  if (!hasAny) return "";
+
+  const redFlags = [];
+  if (c.priority && c.priority !== "programado") redFlags.push("Prioridad marcada como " + c.priority.replaceAll("_", " ").toUpperCase());
+  if (/ictus|stroke|déficit focal|afasia|hemiparesia/i.test([motivo, libre, ...chatPrevio].join(" "))) redFlags.push("Sospecha neurológica aguda (valorar ventana terapéutica)");
+
+  const puntos = [
+    ["Motivo clínico principal", motivo || "No especificado"],
+    ["Antecedentes relevantes", antecedentes.length ? antecedentes.join("; ") : "No aportados"],
+    ["Evolución temporal", "No claramente especificada en los datos aportados"],
+    ["Pruebas/estudios previos", prevRad.length ? prevRad.join("; ") : "No aportados"],
+    ["Informes clínicos previos", informes.length ? informes.join("; ") : "No aportados"],
+    ["Red flags / urgencia", redFlags.length ? redFlags.join("; ") : "Sin alertas explícitas en la información recibida"],
+  ];
+
+  const vacios = [];
+  if (!motivo) vacios.push("Falta concretar el motivo clínico principal");
+  if (!antecedentes.length) vacios.push("Sin antecedentes clínicos relevantes detallados");
+  if (!prevRad.length) vacios.push("Sin informes radiológicos previos específicos");
+  if (!informes.length) vacios.push("Sin informes clínicos complementarios");
+
+  const prosa = [
+    motivo ? `El contexto sugiere que el estudio se solicita por ${esc(motivo.toLowerCase())}.` : "No se ha especificado con claridad el motivo clínico de la petición.",
+    antecedentes.length ? `Como antecedentes, se aporta: ${esc(antecedentes.join("; "))}.` : "No constan antecedentes clínicos relevantes aportados.",
+    prevRad.length || informes.length ? `En la documentación previa figuran ${esc(prevRad.length ? "informes radiológicos" : "")} ${esc(prevRad.length && informes.length ? "e" : "")} ${esc(informes.length ? "informes clínicos" : "")}.` : "No se han aportado informes previos de apoyo.",
+    vacios.length ? `Para afinar la interpretación radiológica conviene completar: ${esc(vacios.join("; "))}.` : "La información previa es razonablemente completa para orientar el análisis radiológico inicial.",
+  ].join(" ");
+
+  return `<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
+    <div style="margin-bottom:12px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;">
+      <p style="margin:0;font-size:12px;color:#1d4ed8;font-weight:700;text-transform:uppercase;">Versión 1 · Estructurada y esquemática</p>
+    </div>
+    <div style="padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;">
+      <ul style="margin:0;padding-left:20px;color:#334155;">
+        ${puntos.map(([k,v]) => `<li><strong>${esc(k)}:</strong> ${esc(v)}</li>`).join("")}
+        <li><strong>Vacíos de información:</strong> ${esc(vacios.length ? vacios.join("; ") : "No se detectan vacíos críticos en los datos aportados")}</li>
+      </ul>
+    </div>
+    <div style="margin-bottom:12px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;">
+      <p style="margin:0;font-size:12px;color:#166534;font-weight:700;text-transform:uppercase;">Versión 2 · Prosa clínica ligera</p>
+    </div>
+    <div style="padding:14px 16px;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;color:#374151;">
+      <p style="margin:0;">${prosa}</p>
+    </div>
+  </div>`;
+};
+
 const REPORT_SYS = (c, isDark) => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
 ${buildCtxBlock(c)}
 
@@ -242,6 +304,7 @@ ${buildCtxBlock(c)}
 ${report ? "\n## INFORME\n" + report : ""}
 ${analysis ? "\n## ANÁLISIS\n" + analysis : ""}
 Responde directo, profesional. HTML para complejas, texto para breves. Español.`;
+
 
 const KEY_IDEAS_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica. A partir del informe y análisis del caso, genera exactamente 10 ideas clave que un radiólogo debe llevarse de este caso. Genera HTML profesional con estilos inline. JUEGA CON EL FORMATO: usa negritas, MAYÚSCULAS, subrayados, tamaños variados y colores para que la lectura sea ágil y visualmente atractiva.
 ${buildCtxBlock(c)}
@@ -674,10 +737,11 @@ export default function Page() {
   const [showMP, setShowMP] = useState(false);
   const [showCodeDrop, setShowCodeDrop] = useState(false);
   const [ff, setFf] = useState("");
-  const [expandedCodes, setExpandedCodes] = useState({});
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
+
+  const clinicalContext = useMemo(() => buildClinicalContextHtml(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -861,35 +925,6 @@ export default function Page() {
   const clearAll = () => { setCtx(emptyCtx); setFMsgs([]); setCMsgs([]); setReport(""); setAnalysis(""); setKeyIdeas(""); setJustification(""); setDiffDiag(""); setMindMap(""); setFInput(""); setCInput(""); setErr(""); setCtxSnap(""); setLTab("context"); setRTab("report"); setShowCodeDrop(false); setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 }); };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const sm = MODELS.find(m => m.id === model);
-  const toggleCode = (key) => setExpandedCodes(prev => ({ ...prev, [key]: !prev[key] }));
-
-  const MEDICAL_CODES = [
-    { key: "trauma", icon: "🩸", title: "Código Trauma", desc: "Activación del equipo de trauma ante paciente politraumatizado", items: [
-      { label: "Criterios de activación", text: "Mecanismo de alta energía, caída >3m, atropello, eyección de vehículo, muerte de ocupante, tiempo de extricación >20min." },
-      { label: "Estudios radiológicos", text: "Rx tórax y pelvis AP en box. Body-TC (cráneo, columna cervical, tórax, abdomen-pelvis con CIV) si estabilidad hemodinámica." },
-      { label: "Hallazgos críticos a comunicar", text: "Neumotórax a tensión, hemotórax masivo, taponamiento cardíaco, rotura aórtica, laceración esplénica/hepática con sangrado activo, fractura pélvica inestable." },
-      { label: "Protocolo de imagen", text: "TC multifásica: sin contraste (cráneo), arterial (tórax-abdomen), portal (abdomen-pelvis). Reconstrucciones óseas de columna completa." },
-    ]},
-    { key: "tep", icon: "🫁", title: "Código TEP", desc: "Tromboembolismo pulmonar — activación ante sospecha clínica", items: [
-      { label: "Criterios de activación", text: "Disnea súbita + dolor torácico pleurítico, taquicardia inexplicada, hipotensión con ingurgitación yugular, Wells ≥5 o dímero-D positivo." },
-      { label: "Estudios radiológicos", text: "AngioTC de arterias pulmonares (protocolo TEP). Valorar eco-cardio si inestabilidad hemodinámica y no se puede trasladar." },
-      { label: "Hallazgos críticos", text: "Trombo en tronco pulmonar o arterias principales (TEP masivo), signo de la silla de montar, dilatación VD (ratio VD/VI >1), reflujo a venas suprahepáticas, desviación septal." },
-      { label: "Signos asociados", text: "Infarto pulmonar (opacidad en cuña periférica), derrame pleural, atelectasias laminares. Valorar TVP concomitante si protocolo incluye MMII." },
-    ]},
-    { key: "medula", icon: "🦴", title: "Código Médula", desc: "Lesión medular aguda — emergencia neuroquirúrgica", items: [
-      { label: "Criterios de activación", text: "Déficit motor/sensitivo agudo con nivel medular, síndrome de cola de caballo, traumatismo con sospecha de lesión medular, retención urinaria aguda con clínica neurológica." },
-      { label: "Estudios radiológicos", text: "RM urgente de columna completa (sagital T1, T2, STIR; axial T2 del nivel afectado). TC si sospecha de fractura o contraindicación para RM." },
-      { label: "Hallazgos críticos", text: "Compresión medular por hernia, fragmento óseo o hematoma epidural, mielopatía (hiperintensidad intramedular en T2), estenosis de canal severa, fractura-luxación vertebral." },
-      { label: "Protocolo de imagen", text: "RM con secuencias sagitales T1, T2, STIR de columna completa. Axiales T2 y T1 del segmento afectado. Valorar contraste si sospecha tumoral o infecciosa." },
-    ]},
-    { key: "hemostasis", icon: "🔴", title: "Código Hemostasis", desc: "Hemorragia masiva — activación del protocolo de transfusión", items: [
-      { label: "Criterios de activación", text: "Hemorragia activa con inestabilidad hemodinámica, necesidad prevista de transfusión masiva (>10 CH en 24h), shock hemorrágico, sangrado no controlable." },
-      { label: "Estudios radiológicos", text: "AngioTC del territorio sospechoso (tórax, abdomen, pelvis). Protocolo multifásico para identificar sangrado activo (extravasación de contraste)." },
-      { label: "Hallazgos críticos", text: "Extravasación activa de contraste (blush arterial), pseudoaneurisma, hemoperitoneo/hemotórax, hematoma retroperitoneal en expansión." },
-      { label: "Papel del radiólogo", text: "Identificar foco hemorrágico para planificar embolización por radiología intervencionista. Comunicación inmediata con intervencionismo y cirugía." },
-    ]},
-  ];
-
   const S = {
     root: { display: "flex", flexDirection: "column", height: isMobile ? "auto" : "100vh", minHeight: isMobile ? "100vh" : undefined, width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: isMobile ? "auto" : "hidden", transition: "background 0.3s, color 0.3s" },
     hdr: { display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: isMobile ? "8px 12px" : "10px 18px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: isMobile ? 6 : 10, flexWrap: "wrap" },
@@ -1179,7 +1214,7 @@ export default function Page() {
 
         <div style={S.rp}>
           <div data-tabbar="" style={S.tb}>
-            <Tab active={rTab === "codes"} icon="🚨" label="Códigos" onClick={() => setRTab("codes")} P={P} compact={isMobile} />
+            <Tab active={rTab === "clinicalContext"} icon="🩺" label="Contexto clínico" badge={!!clinicalContext && rTab !== "clinicalContext"} onClick={() => setRTab("clinicalContext")} P={P} compact={isMobile} />
             <Tab active={rTab === "report"} icon="📄" label="Informe" badge={!!report && rTab !== "report"} onClick={() => setRTab("report")} P={P} compact={isMobile} />
             <Tab active={rTab === "analysis"} icon="🔍" label="Análisis" badge={!!analysis && rTab !== "analysis"} onClick={() => setRTab("analysis")} P={P} compact={isMobile} />
             <Tab active={rTab === "keyIdeas"} icon="💡" label="Ideas Clave" badge={!!keyIdeas && rTab !== "keyIdeas"} onClick={() => setRTab("keyIdeas")} P={P} compact={isMobile} />
@@ -1188,38 +1223,12 @@ export default function Page() {
             <Tab active={rTab === "mindMap"} icon="🧠" label="Mapa Mental" badge={!!mindMap && rTab !== "mindMap"} onClick={() => setRTab("mindMap")} P={P} compact={isMobile} />
           </div>
 
-          {rTab === "codes" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.codesHeader, borderColor: P.codesHeaderBorder }}><span style={{ ...S.rt, color: P.codesTitleColor }}>Códigos de activación</span></div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", background: P.codesPanelBg }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {MEDICAL_CODES.map(code => (
-                  <div key={code.key} style={{ borderRadius: 10, border: "1px solid " + P.codesCardBorder, background: P.codesCardBg, overflow: "hidden", transition: "all 0.2s" }}>
-                    <button onClick={() => toggleCode(code.key)} style={{
-                      width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
-                      background: expandedCodes[code.key] ? P.codesCardHeaderBg : "transparent",
-                      border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                      borderBottom: expandedCodes[code.key] ? "1px solid " + P.codesCardBorder : "none",
-                    }}>
-                      <span style={{ fontSize: 20 }}>{code.icon}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: P.codesTitleColor }}>{code.title}</div>
-                        <div style={{ fontSize: 12, color: P.text3, marginTop: 2 }}>{code.desc}</div>
-                      </div>
-                      <span style={{ fontSize: 16, color: P.text3, transition: "transform 0.2s", transform: expandedCodes[code.key] ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
-                    </button>
-                    {expandedCodes[code.key] && (
-                      <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
-                        {code.items.map((item, idx) => (
-                          <div key={idx} style={{ padding: "10px 14px", borderRadius: 8, background: P.codesItemBg, border: "1px solid " + P.codesItemBorder }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: P.codesTitleColor, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{item.label}</div>
-                            <div style={{ fontSize: 13, color: P.text2, lineHeight: 1.6 }}>{item.text}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+          {rTab === "clinicalContext" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+            <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Contexto clínico</span></div>
+            <div style={{ ...S.rc, background: P.chatPanelBg }}>
+              {clinicalContext
+                ? <div dangerouslySetInnerHTML={{ __html: clinicalContext }} />
+                : <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Contexto clínico pendiente</div><div style={S.phD}>Cuando aportes datos del paciente, aquí verás un resumen en formato esquemático y otra versión en prosa.</div></div>}
             </div>
           </div>}
 
