@@ -1041,6 +1041,161 @@ export default function Page() {
     }
   };
 
+  const htmlToText = (html) => {
+    if (!html) return "";
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    return (d.innerText || d.textContent || "").trim();
+  };
+
+  const sanitizeFilename = (value) => (value || "caso-radiologia")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "caso-radiologia";
+
+  const buildExportPayload = () => {
+    const when = new Date();
+    const dateText = when.toLocaleString("es-ES");
+    const reportText = htmlToText(isEditingReport ? editedReport : report);
+    const analysisText = htmlToText(analysis);
+    const keyIdeasText = htmlToText(keyIdeas);
+    const justificationText = htmlToText(justification);
+    const diffDiagText = htmlToText(diffDiag);
+    const mindMapText = htmlToText(mindMap);
+    const ctxText = clinicalContextDraft.trim() || clinicalContextData.structuredText || "Sin contexto clínico estructurado.";
+    const findingsMsgs = fMsgs.filter(m => m.role === "user").map((m, i) => `- ${i + 1}. ${m.content}`).join("\n");
+    const chatMsgs = cMsgs.map((m) => `${m.role === "user" ? "Usuario" : "Asistente"}: ${m.content}`).join("\n\n");
+
+    const sections = [
+      `# Caso radiológico`,
+      `- Fecha de exportación: ${dateText}`,
+      `- Estudio solicitado: ${ctx.studyRequested || "No especificado"}`,
+      `- Prioridad: ${getPriorityLabel(ctx.priority)}`,
+      "",
+      "## Contexto clínico",
+      ctxText,
+      "",
+      "## Informe final",
+      reportText || "Sin informe.",
+      "",
+      "## Hallazgos aportados por el usuario",
+      findingsMsgs || "Sin hallazgos aportados.",
+      "",
+      "## Chat del caso",
+      chatMsgs || "Sin chat libre.",
+      "",
+      "## Análisis",
+      analysisText || "No generado.",
+      "",
+      "## Ideas clave",
+      keyIdeasText || "No generado.",
+      "",
+      "## ¿Justificada?",
+      justificationText || "No generado.",
+      "",
+      "## Diagnóstico diferencial",
+      diffDiagText || "No generado.",
+      "",
+      "## Mapa mental",
+      mindMapText || "No generado.",
+    ];
+
+    return {
+      markdown: sections.join("\n"),
+      baseName: `${sanitizeFilename(ctx.studyRequested || "caso-radiologia")}-${when.toISOString().slice(0, 10)}`,
+    };
+  };
+
+  const downloadFile = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const buildPdfBlobFromText = (text) => {
+    const pageWidth = 595;
+    const pageHeight = 842;
+    const marginX = 50;
+    const marginTop = 790;
+    const maxChars = 95;
+    const maxLinesPerPage = 52;
+    const escapePdfText = (value) => value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+    const wrapLine = (line) => {
+      if (!line.trim()) return [""];
+      const words = line.split(/\s+/);
+      const out = [];
+      let current = "";
+      words.forEach((word) => {
+        const candidate = current ? `${current} ${word}` : word;
+        if (candidate.length <= maxChars) current = candidate;
+        else {
+          if (current) out.push(current);
+          current = word;
+        }
+      });
+      if (current) out.push(current);
+      return out;
+    };
+
+    const wrappedLines = text.split("\n").flatMap(wrapLine);
+    const pages = [];
+    for (let i = 0; i < wrappedLines.length; i += maxLinesPerPage) pages.push(wrappedLines.slice(i, i + maxLinesPerPage));
+    if (!pages.length) pages.push([""]);
+
+    let pdf = "%PDF-1.4\n";
+    const objects = [];
+    const addObject = (body) => {
+      const offset = pdf.length;
+      const id = objects.length + 1;
+      pdf += `${id} 0 obj\n${body}\nendobj\n`;
+      objects.push({ id, offset });
+      return id;
+    };
+
+    const fontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+    const pageIds = [];
+    const contentIds = [];
+
+    pages.forEach((lines) => {
+      const streamLines = ["BT", `/F1 11 Tf`, `${marginX} ${marginTop} Td`];
+      lines.forEach((line, idx) => {
+        if (idx === 0) streamLines.push(`(${escapePdfText(line)}) Tj`);
+        else streamLines.push(`T* (${escapePdfText(line)}) Tj`);
+      });
+      streamLines.push("ET");
+      const content = streamLines.join("\n");
+      const contentId = addObject(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+      contentIds.push(contentId);
+      pageIds.push(null);
+    });
+
+    const pagesId = objects.length + pages.length + 1;
+
+    pages.forEach((_, idx) => {
+      const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentIds[idx]} 0 R >>`);
+      pageIds[idx] = pageId;
+    });
+
+    addObject(`<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map(id => `${id} 0 R`).join(" ")}] >>`);
+    const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+
+    const xrefOffset = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n`;
+    pdf += "0000000000 65535 f \n";
+    objects.forEach((obj) => {
+      pdf += `${String(obj.offset).padStart(10, "0")} 00000 n \n`;
+    });
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+    return new Blob([pdf], { type: "application/pdf" });
+  };
+
   const buildCaseSnapshot = () => ({
     ctx,
     fMsgs,
@@ -1285,11 +1440,26 @@ export default function Page() {
     setEditedReport(report);
     setIsEditingReport(false);
   };
+  const exportCaseAsMarkdown = () => {
+    const payload = buildExportPayload();
+    downloadFile(new Blob([payload.markdown], { type: "text/markdown;charset=utf-8" }), `${payload.baseName}.md`);
+  };
+
+  const exportCaseAsPdf = () => {
+    const payload = buildExportPayload();
+    const pdfBlob = buildPdfBlobFromText(payload.markdown);
+    downloadFile(pdfBlob, `${payload.baseName}.pdf`);
+  };
+
   const saveEditedReport = () => {
     const html = reportEditorRef.current?.innerHTML ?? editedReport;
     setReport(html);
     setEditedReport(html);
     setIsEditingReport(false);
+    setTimeout(() => {
+      try { exportCaseAsPdf(); }
+      catch (e) { setErr("No se pudo exportar el PDF automáticamente: " + e.message); }
+    }, 0);
   };
   const clearAll = () => {
     setCtx(emptyCtx);
@@ -1792,6 +1962,8 @@ export default function Page() {
                 <button onClick={startEditReport} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}>✏️ Editar</button>
               )}
               <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>
+              <button onClick={exportCaseAsMarkdown} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}>⬇️ Markdown</button>
+              <button onClick={exportCaseAsPdf} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBgActive, color: P.gold }}>⬇️ PDF</button>
             </div>}</div>
             <div className="rpt-content" style={S.rc}><style>{`
 .rpt-content [style*="border-top:1px solid #eee"],.rpt-content [style*="border-top:2px solid #888"]{border-top-color:transparent!important}
