@@ -292,7 +292,8 @@ Piensa SIEMPRE: ¿este hallazgo normal es relevante para el diagnóstico, estadi
 
 ## REGLAS
 - Separación visual amplia entre regiones
-- Frases concisas, precisas y profesionales (evitar relleno)
+- Frases concisas, precisas y profesionales (evitar relleno innecesario)
+- Longitud por defecto: INFORME INTERMEDIO (ni telegráfico ni extenso), priorizando lo clave
 - Estilo esquemático, legible y radiológicamente impecable
 - Conclusión: SOLO patología, negrita, mayor→menor gravedad
 - TODAS las estructuras evaluables con normalidad detallada
@@ -316,6 +317,33 @@ ${CORRECTIONS}
 
 ## RESPUESTA
 SOLO HTML. Sin explicaciones, sin markdown, sin backticks. Informe COMPLETO.`;
+
+const REPORT_ADJUST_SYS = (mode, isDark) => `Eres "Asistente de Radiología". Tu tarea es REESCRIBIR un informe radiológico HTML existente manteniendo formato y rigor.
+
+## OBJETIVO
+${mode === "essential"
+  ? `Modo "Dejar lo esencial":
+- Quita texto de relleno y redundancias.
+- Conserva SIEMPRE toda la información clínica y radiológica clave.
+- Mantén un informe claro, corto y útil para decisión clínica.`
+  : `Modo "Añadir detalles":
+- Amplía el informe con normalidad estructurada de las estructuras evaluables que no se hayan mencionado.
+- Añade "cromo" útil (detalle profesional), sin inventar patología.
+- Mantén todos los hallazgos patológicos ya presentes y su relevancia.`}
+
+## REGLAS CRÍTICAS
+- NO perder hallazgos patológicos existentes.
+- NO inventar lesiones ni datos no sustentados.
+- Mantener el bloque de CONCLUSIÓN coherente con HALLAZGOS.
+- Mantener el estilo HTML profesional del informe.
+- Respetar código de colores:
+  * Grave: #CC0000
+  * Leve: #D2691E
+  * Normal vinculado: #2E8B57
+  * Relleno normal: ${isDark ? "#aaa" : "#444"}
+
+## RESPUESTA
+Devuelve SOLO HTML del informe completo, sin markdown ni explicaciones.`;
 
 const ANALYSIS_SYS = (c, report) => `Eres un consultor experto en radiología diagnóstica con un toque de humor sutil y un puntito sarcástico que hace la lectura entretenida. Eres ese compañero brillante que te explica las cosas con rigor científico pero sin aburrir. Usas comentarios ingeniosos, analogías cotidianas y algún guiño cómplice, pero SIEMPRE manteniendo la precisión clínica. No eres un payaso, eres un crack con gracia.
 ${buildCtxBlock(c)}
@@ -911,6 +939,7 @@ export default function Page() {
   const [lTab, setLTab] = useState("context");
   const [rTab, setRTab] = useState("report");
   const [ldReport, setLdReport] = useState(false);
+  const [ldReportAdjust, setLdReportAdjust] = useState(false);
   const [ldAnalysis, setLdAnalysis] = useState(false);
   const [ldChat, setLdChat] = useState(false);
   const [keyIdeas, setKeyIdeas] = useState("");
@@ -1222,6 +1251,32 @@ export default function Page() {
     try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), fMsgs)); setReport(h); }
     catch (e) { setErr("Error regenerar: " + e.message); } setLdReport(false);
   };
+  const adjustReport = async (mode) => {
+    if (!report || ldReportAdjust || isEditingReport) return;
+    setErr("");
+    setLdReportAdjust(true);
+    setRTab("report");
+    try {
+      const userInstruction = mode === "essential"
+        ? "Reescribe este informe dejando solo lo esencial, sin perder información clave."
+        : "Reescribe este informe añadiendo normalidad estructurada y más detalle profesional útil sin inventar patología.";
+      const adjusted = clean(await callAPI(
+        REPORT_ADJUST_SYS(mode, isDark),
+        [{ role: "user", content: `${userInstruction}
+
+INFORME ACTUAL:
+${report}` }],
+        4096
+      ));
+      setReport(adjusted);
+      if (isEditingReport) {
+        setEditedReport(adjusted);
+      }
+    } catch (e) {
+      setErr("Error al ajustar informe: " + e.message);
+    }
+    setLdReportAdjust(false);
+  };
   const genAnalysis = async (focusTab = true) => {
     if (!report || ldAnalysis) return; setLdAnalysis(true); setErr(""); if (focusTab) setRTab("analysis");
     try { setAnalysis(clean(await callAPI(ANALYSIS_SYS(ctx, report), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }]))); }
@@ -1314,6 +1369,7 @@ export default function Page() {
     setShowClinicalHistory(false);
     setShowPriorRadiology(false);
     setShowClinicalReports(false);
+    setLdReportAdjust(false);
     setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
     setTabStatus({ clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
   };
@@ -1789,7 +1845,25 @@ export default function Page() {
                   <button onClick={cancelEditReport} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "transparent", color: P.text2 }}>↩️ Cancelar</button>
                 </>
               ) : (
-                <button onClick={startEditReport} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}>✏️ Editar</button>
+                <>
+                  <button
+                    onClick={() => adjustReport("essential")}
+                    disabled={ldReportAdjust || ldReport}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: ldReportAdjust || ldReport ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}
+                    title="Quita texto de relleno y deja solo lo clave"
+                  >
+                    {ldReportAdjust ? "⏳ Ajustando..." : "✂️ Dejar lo esencial"}
+                  </button>
+                  <button
+                    onClick={() => adjustReport("enhance")}
+                    disabled={ldReportAdjust || ldReport}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "none", cursor: ldReportAdjust || ldReport ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#0ea5e9,#0284c7)", color: "#fff" }}
+                    title="Añade normalidad estructurada y más detalle profesional"
+                  >
+                    {ldReportAdjust ? "⏳ Ajustando..." : "🧩 Añadir detalles"}
+                  </button>
+                  <button onClick={startEditReport} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}>✏️ Editar</button>
+                </>
               )}
               <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>
             </div>}</div>
