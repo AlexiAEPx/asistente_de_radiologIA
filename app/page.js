@@ -407,8 +407,7 @@ SOLO HTML. Sin explicaciones adicionales.`;
 const JUSTIFICATION_SYS = (c, report) => `Eres un experto en justificación de pruebas de imagen y radioprotección. Analiza si la prueba radiológica solicitada estaba clínicamente justificada según las guías de práctica clínica, criterios de adecuación y principios ALARA. Genera HTML profesional con estilos inline.
 ${buildCtxBlock(c)}
 
-## INFORME RADIOLÓGICO
-${report}
+${report ? `## INFORME RADIOLÓGICO\n${report}` : "## INFORME RADIOLÓGICO\nNo disponible (análisis solo con la información de 'Qué sabemos')."}
 
 ## FORMATO HTML
 <div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.7;font-size:14px;color:#333;">
@@ -456,7 +455,8 @@ ${report}
 - Cita guías específicas cuando sea posible (ACR, ESR, SERAM)
 - Considera edad, género, contexto clínico, prioridad
 - Si es urgente/código ictus, valorar la urgencia en la justificación
-- Evalúa si los hallazgos encontrados respaldan la indicación
+- Si hay informe, evalúa si los hallazgos encontrados respaldan la indicación
+- Si no hay informe, centra el análisis exclusivamente en la indicación clínica y su adecuación
 - Menciona dosis efectiva aproximada si aplica (mSv)
 
 SOLO HTML. Sin explicaciones adicionales.`;
@@ -1099,7 +1099,7 @@ export default function Page() {
     catch (e) { setErr("Error ideas clave: " + e.message); } setLdKeyIdeas(false);
   };
   const genJustification = async (focusTab = true) => {
-    if (!report || ldJustification) return; setLdJustification(true); setErr(""); if (focusTab) setRTab("justification");
+    if (!clinicalContextData.hasAny || ldJustification) return; setLdJustification(true); setErr(""); if (focusTab) setRTab("justification");
     try { setJustification(clean(await callAPI(JUSTIFICATION_SYS(ctx, report), [{ role: "user", content: "Analiza la justificación de esta prueba radiológica." }]))); }
     catch (e) { setErr("Error justificación: " + e.message); } setLdJustification(false);
   };
@@ -1652,7 +1652,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
 
           {rTab === "justification" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={{ ...S.rh, background: P.justifHeader, borderColor: P.justifHeaderBorder }}><span style={{ ...S.rt, color: P.justifTitleColor }}>¿Justificada?</span>{justification && <button onClick={genJustification} disabled={ldJustification} style={{ ...S.cb("s"), color: P.justifTitleColor }}>🔄 Regenerar</button>}</div>
-            <div style={{ ...S.rc, background: P.justifBg }}>{ldJustification ? <div style={S.ph}><LoadingDots text="Analizando justificación..." /></div> : justification ? <div dangerouslySetInnerHTML={{ __html: justification }} /> : <div style={S.ph}><div style={S.phI}>❓</div><div style={{ ...S.phT, color: P.justifTitleColor }}>Justificación bajo demanda</div><div style={S.phD}>{report ? "Analiza si esta prueba radiológica estaba clínicamente justificada." : "Genera primero un informe."}</div>{report && <button onClick={genJustification} style={{ ...S.aBtn, background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>❓ Analizar Justificación</button>}</div>}</div>
+            <div style={{ ...S.rc, background: P.justifBg }}>{ldJustification ? <div style={S.ph}><LoadingDots text="Analizando justificación..." /></div> : justification ? <div dangerouslySetInnerHTML={{ __html: justification }} /> : <div style={S.ph}><div style={S.phI}>❓</div><div style={{ ...S.phT, color: P.justifTitleColor }}>Justificación bajo demanda</div><div style={S.phD}>{clinicalContextData.hasAny ? "Analiza la adecuación de la prueba con lo que ya sabemos. No hace falta esperar al informe." : "Completa antes la pestaña 'Qué sabemos'."}</div>{clinicalContextData.hasAny && <button onClick={genJustification} style={{ ...S.aBtn, background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>❓ Analizar Justificación</button>}</div>}</div>
           </div>}
 
           {rTab === "diffDiag" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
