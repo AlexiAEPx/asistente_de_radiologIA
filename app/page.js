@@ -207,6 +207,68 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
     .replace(/\s+/g, " ")
     .trim();
 
+  const extractReasonSignals = (text) => {
+    const source = (text || "").trim();
+    if (!source) return { demographic: "", study: "", priority: "", findings: [] };
+
+    const normalized = source.replace(/\s+/g, " ").trim();
+    const low = normalized.toLowerCase();
+
+    const detectedGender = /\b(mujer|femenin[ao])\b/i.test(normalized)
+      ? "mujer"
+      : /\b(hombre|var[oó]n|masculin[ao])\b/i.test(normalized)
+        ? "hombre"
+        : "";
+    const ageMatch = normalized.match(/\b(\d{1,3})\s*a(?:n|ñ)os\b/i);
+    const detectedAge = ageMatch ? `${ageMatch[1]} años` : "";
+
+    let study = "";
+    const studyMatchers = [
+      /\b(?:tc|tac|rm|rx|pet|angio\s?tc|ecograf(?:i|í)a)\b[^,;:.\n]*/i,
+    ];
+    for (const rx of studyMatchers) {
+      const m = normalized.match(rx);
+      if (m?.[0]) {
+        study = m[0].trim();
+        break;
+      }
+    }
+
+    const priorityMap = [
+      { rx: /\bc[óo]digo ictus\b/i, label: "CÓDIGO ICTUS" },
+      { rx: /\bc[óo]digo trauma\b/i, label: "CÓDIGO TRAUMA" },
+      { rx: /\bc[óo]digo tep\b/i, label: "CÓDIGO TEP" },
+      { rx: /\bc[óo]digo m[ée]dula\b/i, label: "CÓDIGO MÉDULA" },
+      { rx: /\bc[óo]digo hemostasis\b/i, label: "CÓDIGO HEMOSTASIS" },
+      { rx: /\burgente\b/i, label: "URGENTE" },
+    ];
+    const detectedPriority = priorityMap.find(({ rx }) => rx.test(low))?.label || "";
+
+    let findingsChunk = normalized;
+    findingsChunk = findingsChunk.replace(/\b(mujer|femenin[ao]|hombre|var[oó]n|masculin[ao])\b/gi, " ");
+    findingsChunk = findingsChunk.replace(/\b\d{1,3}\s*a(?:n|ñ)os\b/gi, " ");
+    findingsChunk = findingsChunk.replace(/\b(?:tc|tac|rm|rx|pet|angio\s?tc|ecograf(?:i|í)a)\b[^,;:.\n]*/gi, " ");
+    findingsChunk = findingsChunk.replace(/\bc[óo]digo\s+(ictus|trauma|tep|m[ée]dula|hemostasis)\b/gi, " ");
+    findingsChunk = findingsChunk.replace(/\burgente\b/gi, " ");
+
+    const findings = findingsChunk
+      .split(/[\n,;]+/)
+      .map((part) => part.replace(/\s+/g, " ").trim())
+      .map((part) => part.replace(/^(?:sospecha(?:\s+de)?|dx\s*:?)\s*/i, "").trim())
+      .filter(Boolean);
+
+    const demographic = detectedGender && detectedAge
+      ? `${detectedGender}, ${detectedAge}`
+      : detectedGender || detectedAge;
+
+    return {
+      demographic,
+      study,
+      priority: detectedPriority,
+      findings,
+    };
+  };
+
   const inferStudy = () => {
     if (nonEmpty(c.studyRequested)) return nonEmpty(c.studyRequested);
     const source = [motivo, libre].join(" ").toLowerCase();
@@ -218,6 +280,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const reasonLines = motivo
     ? motivo.split(/\n+/).map(sanitizeReason).filter(Boolean)
     : [];
+  const reasonSignals = extractReasonSignals(motivo);
 
   const demographic = (() => {
     const gender = inferGender();
@@ -228,9 +291,11 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
 
   const candidates = [
     demographic,
-    inferStudy(),
-    priorityLabel && priorityLabel !== "Programado" ? priorityLabel : "",
+    inferStudy() || reasonSignals.study,
+    priorityLabel && priorityLabel !== "Programado" ? priorityLabel : reasonSignals.priority,
     ...reasonLines,
+    ...(reasonSignals.demographic && !demographic ? [reasonSignals.demographic] : []),
+    ...reasonSignals.findings,
     ...antecedentes,
     ...prevRad,
     ...informes,
