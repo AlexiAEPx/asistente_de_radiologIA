@@ -74,12 +74,41 @@ const palette = (dark) => dark ? {
 
 const CORRECTIONS = `"sin defectos de reflexión"→"sin defectos de repleción"|"angiotomografía"→"AngioTC"|"quiste de tallo"→"quiste de Tarlov"|"protusiones discotróficas"→"protusiones disco-osteofitarias"|"lobo"→"lóbulo"|"baso"/"vaso"(abdominal)→"bazo"|"células mastoideas"→"celdillas mastoideas"|"L2-S1"→"L5-S1"|"ángulo de Kopp"→"ángulo de Cobb"|"ECografía"→"ecografía"|"edema opaco"→"enema opaco"|"TAG"→"TAC"|"perifysural"→"perifisural"|"alopatia"→"adenopatía"|"Dickson"→"DIXON"|"vaso accesorio"→"bazo accesorio"|"FLIR"→"FLAIR"|"eco-degradiente"→"eco de gradiente"|"reflexión"(digestivo)→"repleción"|"Mattera"→"masetero"`;
 
+const newEntry = () => ({ text: "", collapsed: false, images: [] });
+
+const normalizeEntry = (entry = {}) => ({
+  text: entry.text || "",
+  collapsed: !!entry.collapsed,
+  images: Array.isArray(entry.images) ? entry.images : [],
+});
+
+const normalizeCtx = (ctx = {}) => ({
+  age: ctx.age || "",
+  birthYear: ctx.birthYear || "",
+  gender: ctx.gender || "",
+  studyRequested: ctx.studyRequested || "",
+  priority: ctx.priority || "programado",
+  reason: ctx.reason || "",
+  reasonImages: Array.isArray(ctx.reasonImages) ? ctx.reasonImages : [],
+  clinicalHistory: (ctx.clinicalHistory || [newEntry()]).map(normalizeEntry),
+  priorRadiology: (ctx.priorRadiology || [newEntry()]).map(normalizeEntry),
+  clinicalReports: (ctx.clinicalReports || [newEntry()]).map(normalizeEntry),
+  freeText: ctx.freeText || "",
+  freeTextImages: Array.isArray(ctx.freeTextImages) ? ctx.freeTextImages : [],
+});
+
+const getEntryImageNote = (entry) => {
+  const count = Array.isArray(entry?.images) ? entry.images.length : 0;
+  return count ? ` [${count} imagen${count > 1 ? "es" : ""} pegada${count > 1 ? "s" : ""}]` : "";
+};
+
 const joinEntries = (arr) => {
   if (!Array.isArray(arr)) return arr || "";
-  const items = arr.filter(e => e.text && e.text.trim());
+  const items = arr.filter(e => (e.text && e.text.trim()) || (Array.isArray(e.images) && e.images.length));
   if (!items.length) return "";
-  if (items.length === 1) return items[0].text.trim();
-  return items.map((e, i) => `[${i + 1}] ${e.text.trim()}`).join("\n\n");
+  const renderEntry = (e) => `${(e.text || "").trim() || "[Sin texto]"}${getEntryImageNote(e)}`;
+  if (items.length === 1) return renderEntry(items[0]);
+  return items.map((e, i) => `[${i + 1}] ${renderEntry(e)}`).join("\n\n");
 };
 
 const getPriorityLabel = (priority) => {
@@ -104,12 +133,14 @@ const buildCtxBlock = (c) => {
   const priorityLabel = getPriorityLabel(c.priority);
   if (priorityLabel) p.push("Prioridad: " + priorityLabel);
   if (c.reason) p.push("Motivo: " + c.reason);
+  if (c.reasonImages?.length) p.push(`Motivo: ${c.reasonImages.length} imagen${c.reasonImages.length > 1 ? "es" : ""} clínica${c.reasonImages.length > 1 ? "s" : ""} pegada${c.reasonImages.length > 1 ? "s" : ""}.`);
   const ch = joinEntries(c.clinicalHistory);
   if (ch) p.push("Antecedentes:\n" + ch);
   const pr = joinEntries(c.priorRadiology);
   if (pr) p.push("Informes radiológicos previos:\n" + pr);
   const cr = joinEntries(c.clinicalReports);
   if (cr) p.push("Informes clínicos:\n" + cr);
+  if (c.freeTextImages?.length) p.push(`Información clínica general con ${c.freeTextImages.length} imagen${c.freeTextImages.length > 1 ? "es" : ""} pegada${c.freeTextImages.length > 1 ? "s" : ""}.`);
   return p.length ? "\n\n## CONTEXTO CLÍNICO\n" + p.join("\n\n") : "";
 };
 
@@ -129,7 +160,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
 
   const textoOrigen = [motivo, libre, ...chatPrevio, ...hallazgosAportados].join(" ").trim();
   const priorityLabel = getPriorityLabel(c.priority);
-  const hasAny = [motivo, c.age, c.gender, c.studyRequested, ...antecedentes, ...prevRad, ...informes, libre, ...chatPrevio, ...hallazgosAportados].some(Boolean);
+  const hasAny = [motivo, c.age, c.gender, c.studyRequested, ...antecedentes, ...prevRad, ...informes, libre, ...chatPrevio, ...hallazgosAportados, c.reasonImages?.length, c.freeTextImages?.length].some(Boolean);
   if (!hasAny) {
     return {
       hasAny: false,
@@ -178,6 +209,8 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   if (antecedentes.length) clinicalFocus.push(`Antecedentes útiles para interpretación: ${antecedentes.join("; ")}.`);
   if (prevRad.length) clinicalFocus.push(`Comparativa potencial con estudios previos: ${prevRad.join("; ")}.`);
   if (informes.length) clinicalFocus.push(`Información clínica complementaria aportada: ${informes.join("; ")}.`);
+  if (c.reasonImages?.length) clinicalFocus.push(`Se han adjuntado ${c.reasonImages.length} imágenes en el motivo clínico.`);
+  if (c.freeTextImages?.length) clinicalFocus.push(`Se han adjuntado ${c.freeTextImages.length} imágenes en el campo de texto libre.`);
 
   const intro = [inferGender(), inferAge()].filter(Boolean).join(", ");
   const contextParts = [
@@ -665,31 +698,63 @@ function ThemeToggle({ themePref, setThemePref, P }) {
 }
 
 function MultiEntryGroup({ entries, onChange, label, singularLabel, placeholder, P, ff, setFf, fieldKey, bigH }) {
+  const normalizedEntries = entries.map(entry => ({ ...entry, images: Array.isArray(entry.images) ? entry.images : [] }));
+
   const updateText = (idx, text) => {
-    onChange(entries.map((e, i) => i === idx ? { ...e, text } : e));
+    onChange(normalizedEntries.map((e, i) => i === idx ? { ...e, text } : e));
   };
   const toggleCollapse = (idx) => {
-    onChange(entries.map((e, i) => i === idx ? { ...e, collapsed: !e.collapsed } : e));
+    onChange(normalizedEntries.map((e, i) => i === idx ? { ...e, collapsed: !e.collapsed } : e));
   };
   const removeEntry = (idx) => {
-    if (entries.length <= 1) { onChange([{ text: "", collapsed: false }]); return; }
-    onChange(entries.filter((_, i) => i !== idx));
+    if (normalizedEntries.length <= 1) { onChange([newEntry()]); return; }
+    onChange(normalizedEntries.filter((_, i) => i !== idx));
   };
   const addEntry = () => {
-    onChange([...entries.map(e => e.text.trim() ? { ...e, collapsed: true } : e), { text: "", collapsed: false }]);
+    onChange([...normalizedEntries.map(e => e.text.trim() ? { ...e, collapsed: true } : e), newEntry()]);
   };
 
-  const hasMultiple = entries.length > 1 || entries[0].text.trim();
+  const appendImages = (idx, files) => {
+    if (!files.length) return;
+    Promise.all(files.map(file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("No se pudo leer imagen pegada"));
+      reader.readAsDataURL(file);
+    }))).then(results => {
+      onChange(normalizedEntries.map((e, i) => i === idx ? { ...e, images: [...(e.images || []), ...results] } : e));
+    }).catch(() => {});
+  };
+
+  const onPasteImages = (idx, e) => {
+    const files = Array.from(e.clipboardData?.items || [])
+      .filter(item => item.type.startsWith("image/"))
+      .map(item => item.getAsFile())
+      .filter(Boolean);
+    if (!files.length) return;
+    e.preventDefault();
+    appendImages(idx, files);
+  };
+
+  const removeImage = (idx, imageIdx) => {
+    onChange(normalizedEntries.map((entry, i) => {
+      if (i !== idx) return entry;
+      return { ...entry, images: entry.images.filter((_, j) => j !== imageIdx) };
+    }));
+  };
+
+  const hasMultiple = normalizedEntries.length > 1 || normalizedEntries[0].text.trim() || normalizedEntries[0].images.length;
 
   return (
     <div style={{ marginBottom: 14 }}>
       <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: P.text3, marginBottom: 6, letterSpacing: 0.3, textTransform: "uppercase" }}>
         {label}
       </label>
-      {entries.map((entry, idx) => {
+      {normalizedEntries.map((entry, idx) => {
         const itemKey = `${fieldKey}_${idx}`;
         const focused = ff === itemKey;
-        const num = entries.length > 1 ? ` ${idx + 1}` : "";
+        const num = normalizedEntries.length > 1 ? ` ${idx + 1}` : "";
+        const imageCount = entry.images.length;
 
         if (entry.collapsed && entry.text.trim()) {
           return (
@@ -703,6 +768,7 @@ function MultiEntryGroup({ entries, onChange, label, singularLabel, placeholder,
               <span style={{ flex: 1, fontSize: 12, color: P.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {entry.text.trim().substring(0, 80)}{entry.text.trim().length > 80 ? "…" : ""}
               </span>
+              {!!imageCount && <span style={{ fontSize: 11, color: P.text3, whiteSpace: "nowrap" }}>🖼️ {imageCount}</span>}
               <button onClick={() => toggleCollapse(idx)} title="Editar" style={{
                 background: "none", border: "none", cursor: "pointer", color: P.gold,
                 fontSize: 13, padding: "2px 5px", lineHeight: 1,
@@ -727,7 +793,7 @@ function MultiEntryGroup({ entries, onChange, label, singularLabel, placeholder,
                       fontSize: 11, fontFamily: "inherit", padding: "1px 4px",
                     }}>▲ Guardar</button>
                   )}
-                  {entries.length > 1 && (
+                  {normalizedEntries.length > 1 && (
                     <button onClick={() => removeEntry(idx)} style={{
                       background: "none", border: "none", cursor: "pointer", color: P.errorText,
                       fontSize: 11, fontFamily: "inherit", padding: "1px 4px", fontWeight: 700,
@@ -740,6 +806,7 @@ function MultiEntryGroup({ entries, onChange, label, singularLabel, placeholder,
               placeholder={placeholder}
               value={entry.text}
               onChange={e => updateText(idx, e.target.value)}
+              onPaste={e => onPasteImages(idx, e)}
               onFocus={() => setFf(itemKey)}
               onBlur={() => setFf("")}
               style={{
@@ -751,6 +818,24 @@ function MultiEntryGroup({ entries, onChange, label, singularLabel, placeholder,
                 boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s, background 0.2s",
               }}
             />
+            {!!imageCount && (
+              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {entry.images.map((img, imageIdx) => (
+                  <div key={`${idx}_${imageIdx}`} style={{ position: "relative" }}>
+                    <img src={img} alt={`Imagen pegada ${imageIdx + 1}`} style={{ width: 78, height: 78, objectFit: "cover", borderRadius: 8, border: "1px solid " + P.goldBorder }} />
+                    <button
+                      onClick={() => removeImage(idx, imageIdx)}
+                      title="Eliminar imagen"
+                      style={{
+                        position: "absolute", top: -6, right: -6, borderRadius: 999, border: "none", width: 18, height: 18,
+                        background: P.errorText, color: "#fff", fontSize: 11, lineHeight: 1, cursor: "pointer",
+                      }}
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: P.text4, marginTop: 4 }}>💡 Puedes pegar imágenes con Ctrl/Cmd+V en este campo.</div>
           </div>
         );
       })}
@@ -789,7 +874,7 @@ function CollapsibleSection({ title, subtitle, isOpen, onToggle, P, children }) 
 }
 
 export default function Page() {
-  const emptyCtx = { age: "", birthYear: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: [{ text: "", collapsed: false }], priorRadiology: [{ text: "", collapsed: false }], clinicalReports: [{ text: "", collapsed: false }], freeText: "" };
+  const emptyCtx = normalizeCtx({ age: "", birthYear: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: [newEntry()], priorRadiology: [newEntry()], clinicalReports: [newEntry()], freeText: "" });
 
   const [themePref, setThemePref] = useState("auto");
   const [systemDark, setSystemDark] = useState(false);
@@ -876,6 +961,50 @@ export default function Page() {
     return String(currentYear - year);
   };
 
+  const readImagesFromPaste = (e) => Array.from(e.clipboardData?.items || [])
+    .filter(item => item.type.startsWith("image/"))
+    .map(item => item.getAsFile())
+    .filter(Boolean);
+
+  const filesToDataUrls = (files) => Promise.all(files.map(file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("No se pudo leer imagen pegada"));
+    reader.readAsDataURL(file);
+  })));
+
+  const appendPastedImagesToCtx = async (ctxKey, files) => {
+    if (!files.length) return;
+    try {
+      const images = await filesToDataUrls(files);
+      setCtx(prev => ({ ...prev, [ctxKey]: [...(prev[ctxKey] || []), ...images] }));
+    } catch {}
+  };
+
+  const removeCtxImage = (ctxKey, idx) => {
+    setCtx(prev => ({ ...prev, [ctxKey]: (prev[ctxKey] || []).filter((_, i) => i !== idx) }));
+  };
+
+  const collectContextImageBlocks = () => {
+    const blocks = [];
+    const pushImages = (arr, label) => {
+      (arr || []).forEach((url, idx) => {
+        if (!url || typeof url !== "string" || !url.startsWith("data:image/")) return;
+        const [meta, data] = url.split(",");
+        if (!meta || !data) return;
+        const mediaType = meta.match(/data:(image\/[a-zA-Z0-9+.-]+);base64/)?.[1] || "image/png";
+        blocks.push({ type: "text", text: `${label} ${idx + 1}:` });
+        blocks.push({ type: "image", source: { type: "base64", media_type: mediaType, data } });
+      });
+    };
+    pushImages(ctx.reasonImages, "Imagen del motivo clínico");
+    pushImages(ctx.freeTextImages, "Imagen del totum revolutum");
+    (ctx.clinicalHistory || []).forEach((entry, i) => pushImages(entry.images, `Imagen de antecedente ${i + 1}`));
+    (ctx.priorRadiology || []).forEach((entry, i) => pushImages(entry.images, `Imagen de informe radiológico previo ${i + 1}`));
+    (ctx.clinicalReports || []).forEach((entry, i) => pushImages(entry.images, `Imagen de informe clínico ${i + 1}`));
+    return blocks;
+  };
+
   // Load history from localStorage on mount
   useEffect(() => {
     try {
@@ -953,8 +1082,9 @@ export default function Page() {
   const loadHistoryEntry = (entry) => {
     if (!entry?.snapshot) return;
     const snap = entry.snapshot;
-    setCtx(snap.ctx || emptyCtx);
-    setCtxSnap(JSON.stringify(snap.ctx || emptyCtx));
+    const normalizedSnapCtx = normalizeCtx(snap.ctx || emptyCtx);
+    setCtx(normalizedSnapCtx);
+    setCtxSnap(JSON.stringify(normalizedSnapCtx));
     setFMsgs(snap.fMsgs || []);
     setCMsgs(snap.cMsgs || []);
     setReport(snap.report || "");
@@ -1036,10 +1166,24 @@ export default function Page() {
 
   // ─── API calls go to /api/chat (server proxy) ───
   const callAPI = async (sys, msgs, mt = 4096) => {
+    const ctxImageBlocks = collectContextImageBlocks();
+    const apiMessages = msgs.map((m, idx) => {
+      const baseText = typeof m.content === "string"
+        ? [{ type: "text", text: m.content }]
+        : Array.isArray(m.content)
+          ? m.content
+          : [{ type: "text", text: String(m.content || "") }];
+
+      if (idx === 0 && ctxImageBlocks.length && m.role === "user") {
+        return { role: m.role, content: [...ctxImageBlocks, ...baseText] };
+      }
+      return { role: m.role, content: baseText };
+    });
+
     const r = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: mt, system: sys, messages: msgs.map(m => ({ role: m.role, content: m.content })) }),
+      body: JSON.stringify({ model, max_tokens: mt, system: sys, messages: apiMessages }),
     });
     if (!r.ok) {
       const errData = await r.json().catch(() => ({}));
@@ -1420,7 +1564,31 @@ export default function Page() {
                 onToggle={() => setShowTotum(v => !v)}
                 P={P}
               >
-                <textarea placeholder="Pega aquí todo lo que tengas: edad, sexo, antecedentes, informes previos, informes clínicos, motivo... todo revuelto, sin orden ni concierto." value={ctx.freeText} onChange={e => setCtx({ ...ctx, freeText: e.target.value })} onFocus={() => setFf("ft")} onBlur={() => setFf("")} style={{ ...S.taf(ff === "ft", 120), borderStyle: "dashed", marginBottom: 0 }} />
+                <textarea
+                  placeholder="Pega aquí todo lo que tengas: edad, sexo, antecedentes, informes previos, informes clínicos, motivo... todo revuelto, sin orden ni concierto."
+                  value={ctx.freeText}
+                  onChange={e => setCtx({ ...ctx, freeText: e.target.value })}
+                  onPaste={async (e) => {
+                    const files = readImagesFromPaste(e);
+                    if (!files.length) return;
+                    e.preventDefault();
+                    await appendPastedImagesToCtx("freeTextImages", files);
+                  }}
+                  onFocus={() => setFf("ft")}
+                  onBlur={() => setFf("")}
+                  style={{ ...S.taf(ff === "ft", 120), borderStyle: "dashed", marginBottom: 0 }}
+                />
+                {!!ctx.freeTextImages?.length && (
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {ctx.freeTextImages.map((img, idx) => (
+                      <div key={`ft_img_${idx}`} style={{ position: "relative" }}>
+                        <img src={img} alt={`Imagen totum ${idx + 1}`} style={{ width: 78, height: 78, objectFit: "cover", borderRadius: 8, border: "1px solid " + P.goldBorder }} />
+                        <button onClick={() => removeCtxImage("freeTextImages", idx)} style={{ position: "absolute", top: -6, right: -6, borderRadius: 999, border: "none", width: 18, height: 18, background: P.errorText, color: "#fff", fontSize: 11, lineHeight: 1, cursor: "pointer" }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: P.text4, marginTop: 6 }}>💡 También puedes pegar imágenes con Ctrl/Cmd+V aquí.</div>
               </CollapsibleSection>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                 <div style={{ flex: 1, height: 1, background: P.goldBorder }} />
@@ -1473,7 +1641,13 @@ export default function Page() {
                     </div>}
                   </div>
                 </div></div>
-              <div style={S.fg}><label style={S.lb}>Motivo de petición</label><textarea placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={{ ...S.taf(ff === "re", 84), minHeight: 84 }} /></div>
+              <div style={S.fg}><label style={S.lb}>Motivo de petición</label><textarea placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onPaste={async (e) => {
+                const files = readImagesFromPaste(e);
+                if (!files.length) return;
+                e.preventDefault();
+                await appendPastedImagesToCtx("reasonImages", files);
+              }} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={{ ...S.taf(ff === "re", 84), minHeight: 84 }} /></div>
+              {!!ctx.reasonImages?.length && <div style={{ marginTop: -8, marginBottom: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>{ctx.reasonImages.map((img, idx) => <div key={`re_img_${idx}`} style={{ position: "relative" }}><img src={img} alt={`Imagen motivo ${idx + 1}`} style={{ width: 78, height: 78, objectFit: "cover", borderRadius: 8, border: "1px solid " + P.goldBorder }} /><button onClick={() => removeCtxImage("reasonImages", idx)} style={{ position: "absolute", top: -6, right: -6, borderRadius: 999, border: "none", width: 18, height: 18, background: P.errorText, color: "#fff", fontSize: 11, lineHeight: 1, cursor: "pointer" }}>✕</button></div>)}</div>}
               <CollapsibleSection title="Antecedentes clínicos" isOpen={showClinicalHistory} onToggle={() => setShowClinicalHistory(v => !v)} P={P}>
                 <MultiEntryGroup entries={ctx.clinicalHistory} onChange={v => setCtx({ ...ctx, clinicalHistory: v })} label="Antecedentes clínicos" singularLabel="Antecedente" placeholder="Patologías, cirugías, tratamientos..." P={P} ff={ff} setFf={setFf} fieldKey="hi" />
               </CollapsibleSection>
