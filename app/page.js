@@ -165,6 +165,36 @@ const buildCtxBlock = (c) => {
 
 const esc = (v = "") => String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+const formatChatAssistantResponse = (raw = "") => {
+  const text = String(raw || "").trim();
+  if (!text) return "";
+
+  // Si el modelo ya devolvió HTML, lo respetamos.
+  if (/<\/?[a-z][\s\S]*>/i.test(text)) return text;
+
+  const withBold = esc(text)
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight:800;color:#0f5132;">$1</strong>')
+    .replace(/__(.+?)__/g, '<strong style="font-weight:800;color:#0f5132;">$1</strong>');
+
+  const blocks = withBold
+    .replace(/\r\n?/g, "\n")
+    .split(/\n{2,}/)
+    .map((b) => b.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+      const isList = lines.every((l) => /^[-•*]\s+/.test(l));
+      if (isList) {
+        return `<ul style="margin:0;padding-left:1.2em;">${lines
+          .map((l) => `<li style="margin:0 0 0.35em 0;">${l.replace(/^[-•*]\s+/, "")}</li>`)
+          .join("")}</ul>`;
+      }
+      return `<p style="margin:0;">${lines.join("<br>")}</p>`;
+    });
+
+  return `<div style="font-size:15px;line-height:1.75;font-weight:500;">${blocks.join('<div style="height:0.6em"></div>')}</div>`;
+};
+
 const normalizeCopiedReportText = (raw = "") => String(raw)
   .replace(/\r\n?/g, "\n")
   .replace(/[\t\f\v\u00a0]+/g, " ")
@@ -1643,7 +1673,7 @@ ${report}` }],
     setCMsgs(nm); setCInput(""); setLdChat(true);
     try {
   const response = await callAPI(CHAT_SYS(ctx, report, analysis), nm, 2048);
-  setCMsgs(p => [...p, { role: "assistant", content: response }]);
+  setCMsgs(p => [...p, { role: "assistant", content: formatChatAssistantResponse(response) }]);
 }
     catch (e) { setErr("Error chat: " + e.message); } setLdChat(false);
   };
