@@ -160,6 +160,11 @@ const esc = (v = "") => String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;
 const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const nonEmpty = (v) => (v || "").trim();
   const take = (arr) => (arr || []).map(e => nonEmpty(e.text)).filter(Boolean);
+  const toBullet = (text) => text
+    .replace(/^[\s\-•]+/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[\s,;:.-]+$/g, "");
   const motivo = nonEmpty(c.reason);
   const antecedentes = take(c.clinicalHistory);
   const prevRad = take(c.priorRadiology);
@@ -183,14 +188,15 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
     const g = (c.gender || "").trim().toLowerCase();
     if (["mujer", "femenino", "femenina"].includes(g)) return "mujer";
     if (["hombre", "masculino", "masculina", "varón", "varon"].includes(g)) return "hombre";
-    if (/\bpaciente\s+var[oó]n\b|\bvar[oó]n\b|\bhombre\b|\bmasculino\b/i.test(textoOrigen)) return "hombre";
-    if (/\bpaciente\s+mujer\b|\bmujer\b|\bfemenina\b|\bfemenino\b/i.test(textoOrigen)) return "mujer";
+    const origin = textoOrigen.toLowerCase();
+    if (origin.includes("varón") || origin.includes("varon") || origin.includes("hombre") || origin.includes("masculino")) return "hombre";
+    if (origin.includes("mujer") || origin.includes("femenina") || origin.includes("femenino")) return "mujer";
     return "";
   };
 
   const inferAge = () => {
     if (c.age) return `${c.age} años`;
-    const match = textoOrigen.match(/\b(\d{1,3})\s*a[nñ]os\b/i);
+    const match = textoOrigen.match(/(\d{1,3})\s*a(?:n|ñ)os/i);
     if (match) return `${match[1]} años`;
     return "";
   };
@@ -203,43 +209,53 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
 
   const inferStudy = () => {
     if (nonEmpty(c.studyRequested)) return nonEmpty(c.studyRequested);
-    const source = [motivo, libre].join(" ");
+    const source = [motivo, libre].join(" ").toLowerCase();
     const modalities = ["TC", "TAC", "RM", "RX", "Ecografía", "PET", "AngioTC"];
-    const found = modalities.find(mod => new RegExp(`\\b${mod}\\b`, "i").test(source));
-    return found ? `${found} solicitado` : "";
+    const found = modalities.find(mod => source.includes(mod.toLowerCase()));
+    return found || "";
   };
 
   const reasonLines = motivo
     ? motivo.split(/\n+/).map(sanitizeReason).filter(Boolean)
     : [];
-  const reasonSummary = reasonLines.length ? reasonLines.join(". ") : "";
 
-  const clinicalFocus = [];
-  if (priorityLabel) clinicalFocus.push(`Prioridad asistencial marcada: ${priorityLabel}.`);
-  if (antecedentes.length) clinicalFocus.push(`Antecedentes útiles para interpretación: ${antecedentes.join("; ")}.`);
-  if (prevRad.length) clinicalFocus.push(`Comparativa potencial con estudios previos: ${prevRad.join("; ")}.`);
-  if (informes.length) clinicalFocus.push(`Información clínica complementaria aportada: ${informes.join("; ")}.`);
-  if (c.reasonImages?.length) clinicalFocus.push(`Se han adjuntado ${c.reasonImages.length} imágenes en el motivo clínico.`);
-  if (c.freeTextImages?.length) clinicalFocus.push(`Se han adjuntado ${c.freeTextImages.length} imágenes en el campo de texto libre.`);
+  const demographic = (() => {
+    const gender = inferGender();
+    const age = inferAge();
+    if (gender && age) return `${gender} de ${age}`;
+    return gender || age;
+  })();
 
-  const intro = [inferGender(), inferAge()].filter(Boolean).join(", ");
-  const contextParts = [
-    intro,
+  const candidates = [
+    demographic,
     inferStudy(),
     priorityLabel && priorityLabel !== "Programado" ? priorityLabel : "",
-    reasonSummary,
-    antecedentes.length ? `Antecedentes relevantes: ${antecedentes.join("; ")}.` : "",
-    prevRad.length ? `Comparativa con previos: ${prevRad.join("; ")}.` : "",
-    informes.length ? `Datos clínicos adicionales: ${informes.join("; ")}.` : "",
-  ].filter(Boolean);
+    ...reasonLines,
+    ...antecedentes,
+    ...prevRad,
+    ...informes,
+  ];
+
+  if (c.reasonImages?.length) candidates.push(`${c.reasonImages.length} imagen${c.reasonImages.length > 1 ? "es" : ""} adjunta${c.reasonImages.length > 1 ? "s" : ""} en motivo clínico`);
+  if (c.freeTextImages?.length) candidates.push(`${c.freeTextImages.length} imagen${c.freeTextImages.length > 1 ? "es" : ""} adjunta${c.freeTextImages.length > 1 ? "s" : ""} en texto libre`);
+
+  const seen = new Set();
+  const bullets = [];
+  candidates.forEach((item) => {
+    const cleanItem = toBullet(item || "");
+    if (!cleanItem) return;
+    const key = cleanItem.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    bullets.push(`${cleanItem}.`);
+  });
+
+  if (!bullets.length) bullets.push("Información clínica no concluyente con los datos aportados.");
 
   return {
     hasAny: true,
     originalRequestText: motivo,
-    structuredText: [
-      `CONTEXTO CLÍNICO: ${contextParts.join(" ") || "Información clínica no concluyente con los datos aportados."}`,
-      clinicalFocus.length ? `Claves para interpretación radiológica: ${clinicalFocus.join(" ")}` : "",
-    ].filter(Boolean).join("\n\n"),
+    structuredText: ["CONTEXTO CLÍNICO:", ...bullets.map(line => `- ${line}`)].join("\n"),
   };
 };
 
@@ -250,16 +266,17 @@ Reescribe y corrige el texto clínico de entrada para dejarlo listo para un info
 Objetivo de estilo:
 - Español médico impecable, breve y esquemático.
 - Corregir ortografía, gramática y puntuación.
-- Evitar mayúsculas innecesarias.
-- Sintetizar sin perder información clínica relevante.
-- No usar etiquetas tipo "género:", "edad:", "procesado", "síntesis de IA".
-- Integrar datos como texto natural (ejemplo: "mujer, 46 años").
+- Frases cortas y rápidas de leer.
+- No repetir la misma información en varias viñetas.
+- No usar etiquetas tipo "Paciente", "Sexo:", "Edad:", "Estudio solicitado:".
+- No añadir notas, advertencias ni explicaciones meta.
 
 Formato de salida obligatorio:
 - Entregar únicamente texto plano.
-- Empezar exactamente por "CONTEXTO CLÍNICO: ".
-- Sin listas con guiones ni numeración.
-- No añadir notas, advertencias ni explicaciones meta.`;
+- Empezar exactamente por "CONTEXTO CLÍNICO:" en una línea propia.
+- Usar viñetas con guion para cada dato clínico (una línea por viñeta).
+- Cuando aplique, fusionar en una sola viñeta género + edad + prueba (ej.: "hombre de 45 años, ecografía abdominal").
+- No usar numeración ni subtítulos extra.`;
 
 const CLINICAL_RECOMMENDATIONS_SYS = `Eres un asistente de radiología orientado a la práctica.
 
