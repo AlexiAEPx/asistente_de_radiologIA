@@ -1796,6 +1796,7 @@ export default function Page() {
             <div className="rpt-content" style={S.rc}><style>{`
 .rpt-content [style*="border-top:1px solid #eee"],.rpt-content [style*="border-top:2px solid #888"]{border-top-color:transparent!important}
 .rpt-content [style*="border-bottom:1px solid #ccc"]{border-bottom-color:transparent!important}
+.rpt-content p{margin-top:0.35em!important;margin-bottom:0.55em!important}
 ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#333"]{color:inherit!important}
 .rpt-content p[style*="color:#555"],.rpt-content p[style*="color:#666"]{color:${P.text3}!important}
 .rpt-content p[style*="color:#444"]{color:${P.text2}!important}
