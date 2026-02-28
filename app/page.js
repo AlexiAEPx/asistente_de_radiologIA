@@ -1662,6 +1662,18 @@ ${report}` }],
     setLdClinicalRecommendations(false);
   };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
+  const syncEditedReportFromEditor = () => {
+    const html = reportEditorRef.current?.innerHTML ?? "";
+    setEditedReport(html);
+    return html;
+  };
+  const handleReportEditorPaste = (e) => {
+    e.preventDefault();
+    const plainText = e.clipboardData?.getData("text/plain") || "";
+    if (!plainText) return;
+    const safeHtml = esc(plainText).replace(/\n/g, "<br>");
+    document.execCommand("insertHTML", false, safeHtml);
+  };
   const startEditReport = () => {
     setEditedReport(report);
     setIsEditingReport(true);
@@ -1690,7 +1702,7 @@ ${report}` }],
   };
 
   const saveEditedReport = () => {
-    const html = reportEditorRef.current?.innerHTML ?? editedReport;
+    const html = syncEditedReportFromEditor() || editedReport;
     setReport(html);
     setEditedReport(html);
     setIsEditingReport(false);
@@ -2299,8 +2311,10 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                   ref={reportEditorRef}
                   contentEditable
                   suppressContentEditableWarning
-                  onInput={(e) => setEditedReport(e.currentTarget.innerHTML)}
-                  style={{ border: "1px dashed " + P.goldBorderFocus, borderRadius: 10, padding: isMobile ? 10 : 14, background: P.inputBgFocus, minHeight: 240, outline: "none" }}
+                  onInput={syncEditedReportFromEditor}
+                  onBlur={syncEditedReportFromEditor}
+                  onPaste={handleReportEditorPaste}
+                  style={{ border: "1px dashed " + P.goldBorderFocus, borderRadius: 10, padding: isMobile ? 10 : 14, background: P.inputBgFocus, minHeight: 240, outline: "none", whiteSpace: "pre-wrap" }}
                   dangerouslySetInnerHTML={{ __html: editedReport }}
                 />
               </div> : <div ref={reportViewRef} dangerouslySetInnerHTML={{ __html: report }} />) : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
