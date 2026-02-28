@@ -157,6 +157,15 @@ const buildCtxBlock = (c) => {
 
 const esc = (v = "") => String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+const normalizeCopiedReportText = (raw = "") => String(raw)
+  .replace(/\r\n?/g, "\n")
+  .replace(/[\t\f\v\u00a0]+/g, " ")
+  .replace(/\n[ \t]+/g, "\n")
+  .replace(/[ \t]+\n/g, "\n")
+  .replace(/\n{3,}/g, "\n\n")
+  .replace(/[ ]{2,}/g, " ")
+  .trim();
+
 const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const nonEmpty = (v) => (v || "").trim();
   const take = (arr) => (arr || []).map(e => nonEmpty(e.text)).filter(Boolean);
@@ -1428,6 +1437,7 @@ export default function Page() {
   const fInpRef = useRef(null);
   const cInpRef = useRef(null);
   const reportEditorRef = useRef(null);
+  const reportViewRef = useRef(null);
 
   useEffect(() => {
     if (!isEditingReport) setEditedReport(report);
@@ -1583,7 +1593,16 @@ ${report}` }],
     catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
   };
 
-  const cpText = async () => { if (!report) return; const d = document.createElement("div"); d.innerHTML = report; await navigator.clipboard.writeText(d.innerText || d.textContent); setCopied("t"); setTimeout(() => setCopied(""), 2500); };
+  const cpText = async () => {
+    if (!report) return;
+    const sourceNode = isEditingReport ? reportEditorRef.current : reportViewRef.current;
+    const fallbackNode = document.createElement("div");
+    fallbackNode.innerHTML = report;
+    const rawText = sourceNode?.innerText || sourceNode?.textContent || fallbackNode.innerText || fallbackNode.textContent || "";
+    await navigator.clipboard.writeText(normalizeCopiedReportText(rawText));
+    setCopied("t");
+    setTimeout(() => setCopied(""), 2500);
+  };
   const cpClinicalContext = async () => { if (!clinicalContextDraft.trim()) return; await navigator.clipboard.writeText(clinicalContextDraft); setCopied("clinical"); setTimeout(() => setCopied(""), 2500); };
   const polishClinicalContext = async () => {
     if (!clinicalContextDraft.trim() || ldClinicalPolish) return;
@@ -2202,7 +2221,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                   style={{ border: "1px dashed " + P.goldBorderFocus, borderRadius: 10, padding: isMobile ? 10 : 14, background: P.inputBgFocus, minHeight: 240, outline: "none" }}
                   dangerouslySetInnerHTML={{ __html: editedReport }}
                 />
-              </div> : <div dangerouslySetInnerHTML={{ __html: report }} />) : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
+              </div> : <div ref={reportViewRef} dangerouslySetInnerHTML={{ __html: report }} />) : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
             {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal vinculado"], [isDark ? "#aaa" : "#444", "Relleno"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
 
