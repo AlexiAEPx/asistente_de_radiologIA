@@ -1081,6 +1081,8 @@ export default function Page() {
   const [spending, setSpending] = useState({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [closeAfterExport, setCloseAfterExport] = useState(false);
   const [tabStatus, setTabStatus] = useState({
     clinicalContext: "idle",
     report: "idle",
@@ -1213,12 +1215,34 @@ export default function Page() {
     const ctxText = clinicalContextDraft.trim() || clinicalContextData.structuredText || "Sin contexto clínico estructurado.";
     const findingsMsgs = fMsgs.filter(m => m.role === "user").map((m, i) => `- ${i + 1}. ${m.content}`).join("\n");
     const chatMsgs = cMsgs.map((m) => `${m.role === "user" ? "Usuario" : "Asistente"}: ${m.content}`).join("\n\n");
+    const priorHistory = joinEntries(ctx.clinicalHistory) || "No aportado.";
+    const priorReports = joinEntries(ctx.priorRadiology) || "No aportado.";
+    const clinicalReportsText = joinEntries(ctx.clinicalReports) || "No aportado.";
+    const generalInfo = (ctx.freeText || "").trim() || "No aportada.";
+    const reasonText = (ctx.reason || "").trim() || "No aportado.";
 
     const sections = [
       `# Caso radiológico`,
       `- Fecha de exportación: ${dateText}`,
       `- Estudio solicitado: ${ctx.studyRequested || "No especificado"}`,
+      `- Edad: ${ctx.age ? `${ctx.age} años` : "No especificada"}`,
+      `- Género: ${ctx.gender || "No especificado"}`,
       `- Prioridad: ${getPriorityLabel(ctx.priority)}`,
+      "",
+      "## Información aportada del caso (original)",
+      `- Motivo de petición: ${reasonText}`,
+      "",
+      "### Antecedentes",
+      priorHistory,
+      "",
+      "### Informes radiológicos previos",
+      priorReports,
+      "",
+      "### Informes clínicos",
+      clinicalReportsText,
+      "",
+      "### Información libre (totum revolutum)",
+      generalInfo,
       "",
       "## Contexto clínico",
       ctxText,
@@ -1649,12 +1673,20 @@ ${report}` }],
   const exportCaseAsMarkdown = () => {
     const payload = buildExportPayload();
     downloadFile(new Blob([payload.markdown], { type: "text/markdown;charset=utf-8" }), `${payload.baseName}.md`);
+    const shouldClose = closeAfterExport;
+    setShowExport(false);
+    setCloseAfterExport(false);
+    if (shouldClose) clearAll();
   };
 
   const exportCaseAsPdf = () => {
     const payload = buildExportPayload();
     const pdfBlob = buildPdfBlobFromText(payload.markdown);
     downloadFile(pdfBlob, `${payload.baseName}.pdf`);
+    const shouldClose = closeAfterExport;
+    setShowExport(false);
+    setCloseAfterExport(false);
+    if (shouldClose) clearAll();
   };
 
   const saveEditedReport = () => {
@@ -1694,6 +1726,44 @@ ${report}` }],
     setLdReportAdjust(false);
     setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
     setTabStatus({ clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
+    setShowExport(false);
+    setCloseAfterExport(false);
+    setShowHistory(false);
+  };
+  const closeCase = () => {
+    const hasCaseData = [
+      report,
+      analysis,
+      keyIdeas,
+      justification,
+      diffDiag,
+      mindMap,
+      clinicalRecommendations,
+      clinicalContextDraft,
+      ctx.reason,
+      ctx.freeText,
+      joinEntries(ctx.clinicalHistory),
+      joinEntries(ctx.priorRadiology),
+      joinEntries(ctx.clinicalReports),
+      fMsgs.length > 0,
+      cMsgs.length > 0,
+    ].some((item) => (typeof item === "boolean" ? item : Boolean(String(item || "").trim())));
+
+    if (!hasCaseData) {
+      clearAll();
+      return;
+    }
+
+    const wantsExport = window.confirm("¿Quieres exportar este caso antes de cerrarlo? Pulsa 'Aceptar' para exportar o 'Cancelar' para cerrar sin exportar.");
+    if (wantsExport) {
+      setCloseAfterExport(true);
+      setShowExport(true);
+    }
+    else {
+      const confirmCloseWithoutExport = window.confirm("Se cerrará el caso sin exportar. ¿Confirmas que quieres continuar?");
+      if (!confirmCloseWithoutExport) return;
+      clearAll();
+    }
   };
   const hk = (e, fn) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fn(); } };
   const markTabRead = (tabKey) => {
@@ -1833,7 +1903,7 @@ ${report}` }],
             ))}</div>}
           </div>
           <div style={{ position: "relative" }}>
-            <button onClick={() => setShowHistory(!showHistory)} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
+            <button onClick={() => { setShowHistory(!showHistory); setShowExport(false); }} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
               <span>Historial</span>
               {history.length > 0 && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, borderRadius: 9, background: P.gold, color: isDark ? "#111" : "#fff", fontSize: 10, fontWeight: 700, padding: "0 4px" }}>{history.length}</span>}
             </button>
@@ -1888,6 +1958,20 @@ ${report}` }],
               </div>
             </>}
           </div>
+          <div style={{ position: "relative" }}>
+            <button onClick={() => { setCloseAfterExport(false); setShowExport(!showExport); setShowHistory(false); }} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
+              <span>Exportar</span>
+              <span style={{ fontSize: 10 }}>▾</span>
+            </button>
+            {showExport && <>
+              <div onClick={() => setShowExport(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+              <div style={{ position: isMobile ? "fixed" : "absolute", top: isMobile ? "auto" : "calc(100% + 6px)", bottom: isMobile ? 0 : "auto", left: isMobile ? 0 : "auto", right: isMobile ? 0 : 0, width: isMobile ? "100%" : 250, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: isMobile ? "12px 12px 0 0" : 12, boxShadow: P.dropdownShadow, zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <button onClick={exportCaseAsMarkdown} style={{ padding: "11px 14px", textAlign: "left", border: "none", background: "transparent", color: P.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>⬇️ Exportar Markdown</button>
+                <button onClick={exportCaseAsPdf} style={{ padding: "11px 14px", textAlign: "left", border: "none", borderTop: "1px solid " + P.goldBorder, background: "transparent", color: P.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>⬇️ Exportar PDF</button>
+              </div>
+            </>}
+          </div>
+          <button onClick={closeCase} style={S.clr}>Cerrar caso</button>
           <button onClick={clearAll} style={S.clr}>Nueva sesión</button>
         </div>
       </div>
@@ -2200,8 +2284,6 @@ ${report}` }],
                 </>
               )}
               <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>
-              <button onClick={exportCaseAsMarkdown} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}>⬇️ Markdown</button>
-              <button onClick={exportCaseAsPdf} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBgActive, color: P.gold }}>⬇️ PDF</button>
             </div>}</div>
             <div className="rpt-content" style={S.rc}><style>{`
 .rpt-content [style*="border-top:1px solid #eee"],.rpt-content [style*="border-top:2px solid #888"]{border-top-color:transparent!important}
