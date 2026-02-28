@@ -209,6 +209,12 @@ const normalizeCopiedReportText = (raw = "") => String(raw)
   .replace(/[ ]{2,}/g, " ")
   .trim();
 
+const splitFreeTextIntoItems = (text = "") => String(text || "")
+  .replace(/\r\n?/g, "\n")
+  .split(/\n+/)
+  .map((line) => line.trim())
+  .filter(Boolean);
+
 const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const nonEmpty = (v) => (v || "").trim();
   const take = (arr) => (arr || []).map(e => nonEmpty(e.text)).filter(Boolean);
@@ -222,6 +228,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const prevRad = take(c.priorRadiology);
   const informes = take(c.clinicalReports);
   const libre = nonEmpty(c.freeText);
+  const libreItems = splitFreeTextIntoItems(libre);
   const chatPrevio = (cMsgs || []).filter(m => m.role === "user").map(m => nonEmpty(m.content)).filter(Boolean);
   const hallazgosAportados = (fMsgs || []).filter(m => m.role === "user").map(m => nonEmpty(m.content)).filter(Boolean);
 
@@ -348,6 +355,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
     ...reasonLines,
     ...(reasonSignals.demographic && !demographic ? [reasonSignals.demographic] : []),
     ...reasonSignals.findings,
+    ...libreItems,
     ...antecedentes,
     ...prevRad,
     ...informes,
@@ -411,8 +419,14 @@ Formato de salida obligatorio:
 - Incluir umbrales/criterios cuando sea útil (ej.: medidas, signos, comparativas).
 - Evitar explicaciones largas, disclaimers o metacomentarios.`;
 
-const REPORT_SYS = (c, isDark) => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
+const REPORT_SYS = (c, isDark, processedClinicalContext = "") => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
 ${buildCtxBlock(c)}
+
+## CONTEXTO CLÍNICO PROCESADO (OBLIGATORIO EN LA SALIDA)
+- Al INICIO absoluto del informe, añade un bloque HTML con título "CONTEXTO CLÍNICO PROCESADO".
+- Debe contener una copia fiel y literal del siguiente contexto clínico ya procesado (sin resumir ni omitir líneas):
+${processedClinicalContext || "CONTEXTO CLÍNICO:\n- Sin contexto clínico estructurado."}
+- Este bloque debe aparecer antes de la técnica, hallazgos y conclusión.
 
 ## COLORES (OBLIGATORIO en cada fragmento)
 - Patológico importante: <span style="color:#CC0000;font-style:italic;font-weight:bold;">texto</span>
@@ -1587,12 +1601,23 @@ export default function Page() {
     setErr(""); const um = { role: "user", content: t }; const nm = [...fMsgs, um];
     setFMsgs(nm); setFInput(""); setLdReport(true); setRTab("report");
     if (isMobile) setMobilePanel("right");
-    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), nm)); setFMsgs(p => [...p, { role: "assistant", content: h }]); setReport(h); setCtxSnap(JSON.stringify(ctx)); saveToHistory(h, ctx); }
+    try {
+      const processedClinicalContext = clinicalContextDraft.trim() || clinicalContextData.structuredText || "";
+      const h = clean(await callAPI(REPORT_SYS(ctx, isDark, processedClinicalContext), nm));
+      setFMsgs(p => [...p, { role: "assistant", content: h }]);
+      setReport(h);
+      setCtxSnap(JSON.stringify(ctx));
+      saveToHistory(h, ctx);
+    }
     catch (e) { setErr("Error informe: " + e.message); } setLdReport(false);
   };
   const regenReport = async () => {
     if (!fMsgs.length || ldReport) return; setLdReport(true); setErr(""); setRTab("report");
-    try { const h = clean(await callAPI(REPORT_SYS(ctx, isDark), fMsgs)); setReport(h); }
+    try {
+      const processedClinicalContext = clinicalContextDraft.trim() || clinicalContextData.structuredText || "";
+      const h = clean(await callAPI(REPORT_SYS(ctx, isDark, processedClinicalContext), fMsgs));
+      setReport(h);
+    }
     catch (e) { setErr("Error regenerar: " + e.message); } setLdReport(false);
   };
   const adjustReport = async (mode) => {
