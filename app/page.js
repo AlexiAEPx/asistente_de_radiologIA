@@ -2226,14 +2226,14 @@ ${report}` }],
                   disabled={ldClinicalRecommendations || !(clinicalContextDraft.trim() || clinicalContextData.structuredText)}
                   style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: ldClinicalRecommendations ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
                 >
-                  {ldClinicalRecommendations ? "⏳ Recomendando..." : "🧭 Recomendaciones"}
+                  {ldClinicalRecommendations ? "🤖 ⏳ Recomendando..." : "🤖 🧭 Recomendaciones"}
                 </button>
                 <button
                   onClick={polishClinicalContext}
                   disabled={ldClinicalPolish || !clinicalContextDraft.trim()}
                   style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: ldClinicalPolish ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: ldClinicalPolish ? (isDark ? "#333" : "#ccc") : "linear-gradient(135deg,#6366f1,#4338ca)", color: "#fff" }}
                 >
-                  {ldClinicalPolish ? "⏳ Procesando..." : "✨ Corregir con IA"}
+                  {ldClinicalPolish ? "🤖 ⏳ Procesando..." : "🤖 ✨ Corregir con IA"}
                 </button>
                 <button
                   onClick={cpClinicalContext}
@@ -2255,7 +2255,7 @@ ${report}` }],
                       />
                     </div>
                     <div style={{ padding: "14px 16px", background: P.recoPanelBg, border: "1px solid " + P.recoPanelBorder, borderRadius: 10 }}>
-                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>Recomendaciones para este caso</div>
+                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>🤖 Recomendaciones para este caso</div>
                       <div style={{ whiteSpace: "pre-wrap", color: P.text }}>{clinicalRecommendations || "Genera recomendaciones para ver un listado breve de hallazgos clave a buscar según este contexto clínico."}</div>
                     </div>
                     <div style={{ padding: "14px 16px", background: P.inputBg, border: "1px solid " + P.inputBorder, borderRadius: 10 }}>
