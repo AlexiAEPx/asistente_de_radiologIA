@@ -11,6 +11,11 @@ const MODELS = [
 
 const DEFAULT_MODEL_KEY = MODELS[2].key;
 
+const ASSISTANT_MODES = {
+  clinical: "clinical",
+  teaching: "teaching",
+};
+
 // Pricing per million tokens (USD)
 const PRICING = {
   "anthropic:claude-haiku-4-5-20251001":  { input: 0.80, output: 4.00 },
@@ -500,80 +505,28 @@ ${mode === "essential"
 ## RESPUESTA
 Devuelve SOLO HTML del informe completo, sin markdown ni explicaciones.`;
 
-const ANALYSIS_SYS = (c, report) => `Eres un consultor experto en radiología diagnóstica con un toque de humor sutil y un puntito sarcástico que hace la lectura entretenida. Eres ese compañero brillante que te explica las cosas con rigor científico pero sin aburrir. Usas comentarios ingeniosos, analogías cotidianas y algún guiño cómplice, pero SIEMPRE manteniendo la precisión clínica. No eres un payaso, eres un crack con gracia.
+const ANALYSIS_SYS = (c, report, assistantMode = ASSISTANT_MODES.clinical) => `Eres consultor experto en radiología diagnóstica.
 ${buildCtxBlock(c)}
 
 ## INFORME ACTUAL
 ${report}
 
-## TONO Y ESTILO
-- Humor sutil y sarcasmo ligero: como el radiólogo veterano que ha visto de todo y te lo cuenta con una media sonrisa. Ejemplo: "Spoiler alert: ese nódulo no pinta bien" o "La pleura dice: estoy bien, gracias por preguntar".
-- Usa expresiones coloquiales médicas que conecten con el lector. Puedes tutear al lector.
-- Intercala comentarios ingeniosos entre la información seria. Que se note que hay un humano (bueno, casi) detrás.
-- Haz que el diagnóstico principal sea DRAMÁTICO visualmente (grande, en color, llamativo).
-- Usa analogías cuando ayuden: "ese derrame es más grande que mi ego".
-- Las perlas radiológicas deben sonar como consejos de mentor experimentado, con un toque de "esto no te lo enseñan en los libros".
-- IMPORTANTE: El humor NUNCA debe comprometer la precisión médica. Los datos clínicos son sagrados.
+## MODO
+${assistantMode === ASSISTANT_MODES.teaching
+  ? "MODO DOCENTE: permite un tono cercano y recursos didácticos para enseñar razonamiento clínico."
+  : "MODO CLÍNICO: tono estricto, profesional y asistencial. Sin humor, sin sarcasmo y sin adornos innecesarios."}
 
-## ESTRUCTURA HTML (usa estilos inline, juega con tamaños, colores, negritas, subrayados y formato visual variado)
-<div style="font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.8;font-size:14px;color:#333;">
+## OBJETIVO
+- Prioriza seguridad clínica, coherencia y accionabilidad.
+- Identifica diagnóstico principal, diferencial, hallazgos críticos y recomendaciones.
+- Señala posibles incoherencias o lagunas de información.
+- Incluye diagnósticos 'can't miss' y pasos de manejo priorizados.
 
-<div style="margin-bottom:2em;padding:20px;background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-left:5px solid #4f46e5;border-radius:0 12px 12px 0;box-shadow:0 2px 8px rgba(79,70,229,0.1);">
-<p style="font-weight:800;font-size:1.3em;color:#3730a3;margin-bottom:10px;letter-spacing:-0.02em;">📋 RESUMEN DEL CASO</p>
-<p style="font-size:15px;color:#1e1b4b;line-height:1.8;">[Resumen conciso pero con personalidad. Empieza con algo que enganche, ej: "Nos llega un/a paciente de X años que..." con un toque narrativo breve]</p></div>
-
-<div style="margin-bottom:2em;">
-<p style="font-weight:800;font-size:1.35em;color:#111;border-bottom:3px solid #6366f1;padding-bottom:8px;margin-bottom:16px;">🔍 DIAGNÓSTICO DIFERENCIAL</p>
-<p style="font-size:13px;color:#6b7280;margin-bottom:14px;font-style:italic;">[Comentario introductorio con humor, ej: "Vamos al grano, que la lista de sospechosos es interesante..."]</p>
-
-<div style="margin:14px 0;padding:18px 20px;background:linear-gradient(135deg,#fef2f2,#fee2e2);border-radius:12px;border:2px solid #fca5a5;box-shadow:0 2px 6px rgba(239,68,68,0.08);">
-<p style="font-weight:800;font-size:1.2em;color:#dc2626;margin-bottom:6px;">🥇 1. [Diagnóstico principal] — <span style="background:#dc2626;color:#fff;padding:2px 10px;border-radius:20px;font-size:0.85em;">[X%]</span></p>
-<p style="font-size:13px;color:#991b1b;font-style:italic;margin-bottom:10px;">[Comentario con personalidad sobre este diagnóstico]</p>
-<p style="margin:4px 0;"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;">✅ A FAVOR</span> [argumentos]</p>
-<p style="margin:4px 0;"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;">❌ EN CONTRA</span> [argumentos]</p>
-<p style="margin:4px 0;"><span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;">🔑 CLAVE</span> <span style="text-decoration:underline;text-decoration-color:#6366f1;font-weight:600;">[dato decisivo]</span></p></div>
-
-<div style="margin:14px 0;padding:16px 20px;background:#fafafa;border-radius:12px;border:1px solid #e5e7eb;">
-<p style="font-weight:700;font-size:1.05em;color:#ea580c;">🥈 2. [Diagnóstico] — <span style="background:#ea580c;color:#fff;padding:2px 10px;border-radius:20px;font-size:0.8em;">[X%]</span></p>
-<p style="margin:4px 0;"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;">✅ A FAVOR</span> [...]</p>
-<p style="margin:4px 0;"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;">❌ EN CONTRA</span> [...]</p>
-<p style="margin:4px 0;"><span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;">🔑 CLAVE</span> <span style="text-decoration:underline;text-decoration-color:#6366f1;font-weight:600;">[...]</span></p></div>
-
-[Repetir para más diagnósticos con estilo similar, reduciendo intensidad visual progresivamente]
-</div>
-
-<div style="margin-bottom:2em;padding:18px 20px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:12px;border:1px solid #86efac;">
-<p style="font-weight:800;font-size:1.2em;color:#166534;margin-bottom:6px;">⚠️ <span style="text-decoration:underline;">DIAGNÓSTICOS "CAN'T MISS"</span></p>
-<p style="font-size:13px;color:#15803d;font-style:italic;margin-bottom:10px;">[Comentario tipo: "Estos son los que no te puedes permitir pasar por alto, o tendrás una charla incómoda con el jefe..."]</p>
-<p>[Lista con los diagnósticos que aunque menos probables serían catastróficos si se pasan por alto, con <strong>negrita</strong> en lo importante]</p></div>
-
-<div style="margin-bottom:2em;">
-<p style="font-weight:800;font-size:1.2em;color:#222;border-bottom:3px solid #a78bfa;padding-bottom:8px;margin-bottom:12px;">📐 ESCALAS Y GRADUACIONES</p>
-<p style="font-size:13px;color:#6b7280;font-style:italic;margin-bottom:10px;">[Comentario introductorio, ej: "Hora de poner números a las sensaciones..."]</p>
-<div style="padding:14px 18px;background:#faf5ff;border-radius:10px;border:1px solid #d8b4fe;">
-<p>[Escalas aplicables con valores <span style="font-size:1.1em;font-weight:800;color:#7c3aed;">[resaltados]</span> y su interpretación. Usa <strong>negrita</strong> para los valores y <span style="color:#7c3aed;">color</span> para las categorías]</p></div></div>
-
-<div style="margin-bottom:2em;">
-<p style="font-weight:800;font-size:1.2em;color:#222;border-bottom:3px solid #67e8f9;padding-bottom:8px;margin-bottom:12px;">👁️ SIGNOS RADIOLÓGICOS CLAVE</p>
-<p style="font-size:13px;color:#6b7280;font-style:italic;margin-bottom:10px;">[Comentario introductorio, ej: "Aquí es donde se separan los radiólogos de los que simplemente miran placas..."]</p>
-<div style="padding:14px 18px;background:#ecfeff;border-radius:10px;border:1px solid #a5f3fc;">
-<p>[Lista de signos con nombre en <strong style="color:#0e7490;">negrita y color</strong>, descripción de qué buscar, y por qué importa. Usa formato visual variado: algunos como bullets, otros como mini-tarjetas]</p></div></div>
-
-<div style="margin-bottom:2em;">
-<p style="font-weight:800;font-size:1.2em;color:#222;border-bottom:3px solid #86efac;padding-bottom:8px;margin-bottom:12px;">🎯 RECOMENDACIONES</p>
-<p style="font-size:13px;color:#6b7280;font-style:italic;margin-bottom:10px;">[Comentario, ej: "Y ahora la parte en la que decimos lo que toca hacer..."]</p>
-<div style="padding:14px 18px;background:#f0fdf4;border-radius:10px;border:1px solid #86efac;">
-<p>[Recomendaciones priorizadas. Usa <span style="font-weight:800;color:#dc2626;">URGENTE</span> / <span style="font-weight:700;color:#ea580c;">IMPORTANTE</span> / <span style="color:#16a34a;">RUTINARIO</span> como etiquetas de prioridad. Incluye plazos sugeridos en <strong>negrita</strong>]</p></div></div>
-
-<div style="padding:20px;background:linear-gradient(135deg,#fefce8,#fef9c3);border-left:5px solid #eab308;border-radius:0 12px 12px 0;box-shadow:0 2px 8px rgba(234,179,8,0.1);">
-<p style="font-weight:800;font-size:1.2em;color:#854d0e;margin-bottom:10px;">💡 PERLAS RADIOLÓGICAS</p>
-<p style="font-size:13px;color:#92400e;font-style:italic;margin-bottom:12px;">[Intro tipo: "De esas cosas que aprendes después de ver 10.000 estudios..."]</p>
-<div style="padding:12px 16px;background:rgba(255,255,255,0.6);border-radius:8px;margin-bottom:8px;">
-<p>[2-4 perlas con formato variado: alguna con <strong>negrita</strong>, otra con <span style="text-decoration:underline;">subrayado</span>, datos numéricos <span style="font-size:1.15em;font-weight:800;color:#b45309;">resaltados</span>. Que suenen a consejo de mentor experimentado con un guiño]</p></div></div>
-
-</div>
-
-SOLO HTML con estilos inline. Probabilidades numéricas obligatorias. Diagnósticos "can't miss" siempre. El humor es el vehículo, la medicina es el destino. NUNCA sacrifiques precisión por un chiste.`;
+## FORMATO DE SALIDA
+- Devuelve SOLO HTML válido con estilos inline.
+- Estructura mínima: resumen, diferencial con probabilidades, can't miss, recomendaciones priorizadas, perlas de QA.
+- Si el modo es clínico, evita frases coloquiales y mantén estilo sobrio.
+`;
 
 const CHAT_SYS = (c, report, analysis) => `Eres consultor de radiología experto.
 ${buildCtxBlock(c)}
@@ -1099,6 +1052,7 @@ export default function Page() {
   const [report, setReport] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [model, setModel] = useState(DEFAULT_MODEL_KEY);
+  const [assistantMode, setAssistantMode] = useState(ASSISTANT_MODES.clinical);
   const [lTab, setLTab] = useState("context");
   const [rTab, setRTab] = useState("report");
   const [ldReport, setLdReport] = useState(false);
@@ -1208,18 +1162,23 @@ export default function Page() {
     return blocks;
   };
 
-  // Load history from localStorage on mount
+  const [storeHistoryLocal, setStoreHistoryLocal] = useState(false);
+
   useEffect(() => {
     try {
+      const enabled = localStorage.getItem("radiology_history_enabled") === "true";
+      setStoreHistoryLocal(enabled);
+      if (!enabled) return;
       const saved = localStorage.getItem("radiology_history");
       if (saved) setHistory(JSON.parse(saved));
     } catch {}
   }, []);
 
-  // Persist history to localStorage whenever it changes
   useEffect(() => {
+    try { localStorage.setItem("radiology_history_enabled", storeHistoryLocal ? "true" : "false"); } catch {}
+    if (!storeHistoryLocal) return;
     try { localStorage.setItem("radiology_history", JSON.stringify(history)); } catch {}
-  }, [history]);
+  }, [history, storeHistoryLocal]);
 
   // Extract a plain-text summary from the report HTML conclusion
   const extractSummary = (html) => {
@@ -1450,6 +1409,7 @@ export default function Page() {
   });
 
   const saveToHistory = (reportHtml, caseCtx) => {
+    if (!storeHistoryLocal) return;
     const now = new Date();
     const entry = {
       id: Date.now(),
@@ -1663,7 +1623,7 @@ ${report}` }],
   };
   const genAnalysis = async (focusTab = true) => {
     if (!report || ldAnalysis) return; setLdAnalysis(true); setErr(""); if (focusTab) setRTab("analysis");
-    try { const nextAnalysis = clean(await callAPI(ANALYSIS_SYS(ctx, report), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }])); setAnalysis(nextAnalysis);
+    try { const nextAnalysis = clean(await callAPI(ANALYSIS_SYS(ctx, report, assistantMode), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }])); setAnalysis(nextAnalysis);
     setTabSignatures(prev => ({ ...prev, analysis: tabInputsSignature.analysis })); }
     catch (e) { setErr("Error análisis: " + e.message); } setLdAnalysis(false);
   };
@@ -1987,10 +1947,12 @@ ${instruction}`;
     { key: "clinicalContext", icon: "🩺", label: "Contexto clínico", run: null, loading: false, canRun: false },
     { key: "report", icon: "📄", label: "Informe", run: null, loading: ldReport, canRun: false },
     { key: "analysis", icon: "🔍", label: "Análisis", run: () => genAnalysis(false), loading: ldAnalysis, canRun: !!report },
-    { key: "keyIdeas", icon: "💡", label: "Ideas Clave", run: () => genKeyIdeas(false), loading: ldKeyIdeas, canRun: !!report },
+    ...(assistantMode === ASSISTANT_MODES.teaching ? [
+      { key: "keyIdeas", icon: "💡", label: "Ideas Clave", run: () => genKeyIdeas(false), loading: ldKeyIdeas, canRun: !!report },
+      { key: "diffDiag", icon: "🚦", label: "Diferencial", run: () => genDiffDiag(false), loading: ldDiffDiag, canRun: !!report },
+      { key: "mindMap", icon: "🧠", label: "Mapa Mental", run: () => genMindMap(false), loading: ldMindMap, canRun: !!report },
+    ] : []),
     { key: "justification", icon: "❓", label: "¿Justificada?", run: () => genJustification(false), loading: ldJustification, canRun: !!clinicalContextData.hasAny },
-    { key: "diffDiag", icon: "🚦", label: "Diferencial", run: () => genDiffDiag(false), loading: ldDiffDiag, canRun: !!report },
-    { key: "mindMap", icon: "🧠", label: "Mapa Mental", run: () => genMindMap(false), loading: ldMindMap, canRun: !!report },
   ];
 
   const selectedModel = getModelByKey(model);
@@ -2113,7 +2075,7 @@ ${instruction}`;
                     <div style={{ textAlign: "center", padding: "30px 10px", color: P.historyEmpty }}>
                       <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: P.historyTitleColor, marginBottom: 4 }}>Sin historial</div>
-                      <div style={{ fontSize: 12, lineHeight: 1.5 }}>Los casos que informes se guardarán aquí automáticamente.</div>
+                      <div style={{ fontSize: 12, lineHeight: 1.5 }}>Los casos se guardan aquí solo si activas el historial local (modo demo, no usar PHI).</div>
                     </div>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2152,6 +2114,14 @@ ${instruction}`;
               </div>
             </>}
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 8, border: "1px solid " + P.goldBorder, background: P.goldBg }}>
+            <span style={{ fontSize: 11, color: P.text3, fontWeight: 700 }}>Modo</span>
+            <button onClick={() => setAssistantMode(ASSISTANT_MODES.clinical)} style={{ ...S.clr, padding: "3px 8px", background: assistantMode === ASSISTANT_MODES.clinical ? P.goldBgActive : "transparent" }}>Clínico</button>
+            <button onClick={() => setAssistantMode(ASSISTANT_MODES.teaching)} style={{ ...S.clr, padding: "3px 8px", background: assistantMode === ASSISTANT_MODES.teaching ? P.goldBgActive : "transparent" }}>Docente</button>
+          </div>
+          <button onClick={() => setStoreHistoryLocal(v => !v)} style={S.clr}>
+            {storeHistoryLocal ? "Historial local: ON" : "Historial local: OFF"}
+          </button>
           <div style={{ position: "relative" }}>
             <button onClick={() => { setCloseAfterExport(false); setShowExport(!showExport); setShowHistory(false); }} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
               <span>Exportar</span>

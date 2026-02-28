@@ -3,6 +3,50 @@ const PROVIDER_KEYS = {
   openai: "OPENAI_API_KEY",
 };
 
+const asText = (value) => (typeof value === "string" ? value : String(value || ""));
+
+const normalizeAnthropicBlockToOpenAI = (block) => {
+  if (!block || typeof block !== "object") return null;
+
+  if (block.type === "text") {
+    return { type: "text", text: asText(block.text) };
+  }
+
+  if (block.type === "image" && block.source?.type === "base64") {
+    const mediaType = block.source.media_type || "image/png";
+    const data = block.source.data || "";
+    if (!data) return null;
+    return {
+      type: "image_url",
+      image_url: { url: `data:${mediaType};base64,${data}` },
+    };
+  }
+
+  return null;
+};
+
+const normalizeMessageForOpenAI = (message) => {
+  if (!message || typeof message !== "object") {
+    return { role: "user", content: "" };
+  }
+
+  const role = message.role || "user";
+
+  if (!Array.isArray(message.content)) {
+    return { role, content: asText(message.content) };
+  }
+
+  const contentBlocks = message.content
+    .map(normalizeAnthropicBlockToOpenAI)
+    .filter(Boolean);
+
+  if (!contentBlocks.length) {
+    return { role, content: "" };
+  }
+
+  return { role, content: contentBlocks };
+};
+
 const providerConfigs = {
   anthropic: {
     url: "https://api.anthropic.com/v1/messages",
@@ -25,16 +69,7 @@ const providerConfigs = {
       max_tokens,
       messages: [
         ...(system ? [{ role: "system", content: system }] : []),
-        ...messages.map((m) => {
-          if (Array.isArray(m.content)) {
-            const textOnly = m.content
-              .filter((b) => b?.type === "text")
-              .map((b) => b.text)
-              .join("\n");
-            return { role: m.role, content: textOnly };
-          }
-          return { role: m.role, content: typeof m.content === "string" ? m.content : String(m.content || "") };
-        }),
+        ...messages.map(normalizeMessageForOpenAI),
       ],
     }),
     parseText: async (response) => {
@@ -55,6 +90,13 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const { provider = "anthropic", model, max_tokens, system, messages } = body;
+
+    if (!model || typeof model !== "string") {
+      return Response.json({ error: "Invalid model" }, { status: 400 });
+    }
+    if (!Array.isArray(messages)) {
+      return Response.json({ error: "Invalid messages payload" }, { status: 400 });
+    }
 
     const config = providerConfigs[provider];
     if (!config) {
