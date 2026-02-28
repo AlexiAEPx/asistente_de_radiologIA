@@ -2243,7 +2243,7 @@ ${report}` }],
                 </button>
               </div>}
             </div>
-            <div style={{ ...S.rc, background: P.chatPanelBg }}>
+            <div style={{ ...S.rc, background: P.chatPanelBg, fontSize: 13, lineHeight: 1.5 }}>
               {clinicalContextData.hasAny
                 ? <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ padding: "14px 16px", background: P.inputBgFocus, border: "1px solid " + P.chatInputBorderFocus, borderRadius: 10 }}>
@@ -2251,7 +2251,7 @@ ${report}` }],
                       <textarea
                         value={clinicalContextDraft}
                         onChange={(e) => setClinicalContextDraft(e.target.value)}
-                        style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, lineHeight: 1.5, outline: "none" }}
+                        style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
                       />
                     </div>
                     <div style={{ padding: "14px 16px", background: P.recoPanelBg, border: "1px solid " + P.recoPanelBorder, borderRadius: 10 }}>
