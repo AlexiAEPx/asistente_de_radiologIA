@@ -1053,14 +1053,11 @@ export default function Page() {
       const d = document.createElement("div");
       d.innerHTML = html;
       const fullText = d.innerText || d.textContent || "";
-      // Try to find the CONCLUSIÓN section
-      const idx = fullText.indexOf("CONCLUSIÓN");
-      if (idx !== -1) {
-        const after = fullText.substring(idx + "CONCLUSIÓN".length).replace(/^[:\s]+/, "");
-        // Get up to RECOMENDACIÓN or end, and cap at 200 chars
-        const endIdx = after.indexOf("RECOMENDACIÓN");
-        const conclusion = (endIdx !== -1 ? after.substring(0, endIdx) : after).trim();
-        if (conclusion.length > 0) return conclusion.length > 200 ? conclusion.substring(0, 200) + "…" : conclusion;
+      // Try to find the CONCLUSIÓN section (case/accent insensitive)
+      const sectionMatch = fullText.match(/conclusi[oó]n\s*:?\s*([\s\S]*?)(?:recomendaci[oó]n\s*:|$)/i);
+      const conclusion = sectionMatch?.[1]?.replace(/\s+/g, " ").trim() || "";
+      if (conclusion.length > 0) {
+        return conclusion.length > 200 ? conclusion.substring(0, 200) + "…" : conclusion;
       }
       // Fallback: first 200 chars of full text
       const clean = fullText.trim();
