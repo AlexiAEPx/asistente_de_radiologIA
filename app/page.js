@@ -33,6 +33,7 @@ const palette = (dark) => dark ? {
   legendBg: "#161622", legendBorder: "rgba(196,151,60,0.15)",
   analysisBg: "linear-gradient(180deg,#141428,#12122a)", analysisHeader: "#161630", analysisHeaderBorder: "rgba(99,102,241,0.2)", analysisTitleColor: "#818cf8",
   chatPanelBg: "linear-gradient(180deg,#0e1a14,#0e1818)", chatHeader: "#0f1f16", chatHeaderBorder: "rgba(34,197,94,0.2)", chatTitleColor: "#4ade80",
+  recoPanelBg: "linear-gradient(180deg,#1a1628,#151425)", recoPanelBorder: "rgba(168,85,247,0.25)", recoTitleColor: "#c084fc",
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.08)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#ccc",
   chatInputBg: "rgba(255,255,255,0.04)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#e0ddd5",
   chatInputAreaBg: "#0f1f16", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
@@ -61,6 +62,7 @@ const palette = (dark) => dark ? {
   legendBg: "#f5f1ea", legendBorder: "#e8e4dc",
   analysisBg: "linear-gradient(180deg,#fafbff,#f5f7ff)", analysisHeader: "#eef2ff", analysisHeaderBorder: "#c7d2fe", analysisTitleColor: "#4338ca",
   chatPanelBg: "linear-gradient(180deg,#fafdfb,#f5faf6)", chatHeader: "#f0fdf4", chatHeaderBorder: "#bbf7d0", chatTitleColor: "#166534",
+  recoPanelBg: "linear-gradient(180deg,#fcfaff,#f7f3ff)", recoPanelBorder: "rgba(168,85,247,0.25)", recoTitleColor: "#7c3aed",
   chatBubbleUser: "linear-gradient(135deg,#22c55e,#16a34a)", chatBubbleAsst: "rgba(34,197,94,0.06)", chatBubbleAsstBorder: "rgba(34,197,94,0.15)", chatBubbleText: "#555",
   chatInputBg: "rgba(255,255,255,0.8)", chatInputBorder: "rgba(34,197,94,0.3)", chatInputBorderFocus: "rgba(34,197,94,0.5)", chatInputColor: "#333",
   chatInputAreaBg: "#f0fdf4", chatSendBg: "linear-gradient(135deg,#22c55e,#16a34a)",
@@ -258,6 +260,22 @@ Formato de salida obligatorio:
 - Empezar exactamente por "CONTEXTO CLÍNICO: ".
 - Sin listas con guiones ni numeración.
 - No añadir notas, advertencias ni explicaciones meta.`;
+
+const CLINICAL_RECOMMENDATIONS_SYS = `Eres un asistente de radiología orientado a la práctica.
+
+A partir del contexto clínico recibido, devuelve recomendaciones concretas y sintetizadas de qué buscar en la prueba solicitada.
+
+Objetivo:
+- Ayudar al radiólogo a enfocar la lectura con hallazgos clave.
+- Ser práctico, breve y accionable.
+- Basarte solo en lo aportado; no inventar datos del paciente.
+
+Formato de salida obligatorio:
+- Texto plano en español.
+- Máximo 6 viñetas con guion simple "- ".
+- Cada viñeta debe ser una recomendación concreta de búsqueda o correlación.
+- Incluir umbrales/criterios cuando sea útil (ej.: medidas, signos, comparativas).
+- Evitar explicaciones largas, disclaimers o metacomentarios.`;
 
 const REPORT_SYS = (c, isDark) => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
 ${buildCtxBlock(c)}
@@ -986,8 +1004,11 @@ export default function Page() {
   const clinicalContextData = useMemo(() => buildClinicalContextData(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
   const [clinicalContextDraft, setClinicalContextDraft] = useState("");
   const [ldClinicalPolish, setLdClinicalPolish] = useState(false);
+  const [clinicalRecommendations, setClinicalRecommendations] = useState("");
+  const [ldClinicalRecommendations, setLdClinicalRecommendations] = useState(false);
   useEffect(() => {
     setClinicalContextDraft(clinicalContextData.structuredText || "");
+    setClinicalRecommendations("");
   }, [clinicalContextData.structuredText]);
 
 
@@ -1110,6 +1131,9 @@ export default function Page() {
       "",
       "## Contexto clínico",
       ctxText,
+      "",
+      "## Recomendaciones contextuales",
+      clinicalRecommendations || "No generado.",
       "",
       "## Informe final",
       reportText || "Sin informe.",
@@ -1253,6 +1277,8 @@ export default function Page() {
     showPriorRadiology,
     showClinicalReports,
     showTotum,
+    clinicalContextDraft,
+    clinicalRecommendations,
   });
 
   const saveToHistory = (reportHtml, caseCtx) => {
@@ -1295,6 +1321,8 @@ export default function Page() {
     setShowPriorRadiology(!!snap.showPriorRadiology);
     setShowClinicalReports(!!snap.showClinicalReports);
     setShowTotum(!!snap.showTotum);
+    setClinicalContextDraft(snap.clinicalContextDraft || "");
+    setClinicalRecommendations(snap.clinicalRecommendations || "");
     setErr("");
     setShowHistory(false);
   };
@@ -1491,6 +1519,23 @@ ${report}` }],
     }
     setLdClinicalPolish(false);
   };
+  const genClinicalRecommendations = async () => {
+    const text = clinicalContextDraft.trim() || clinicalContextData.structuredText || "";
+    if (!text || ldClinicalRecommendations) return;
+    setErr("");
+    setLdClinicalRecommendations(true);
+    try {
+      const reco = (await callAPI(
+        CLINICAL_RECOMMENDATIONS_SYS,
+        [{ role: "user", content: text }],
+        550
+      )).trim();
+      setClinicalRecommendations(reco);
+    } catch (e) {
+      setErr("Error al generar recomendaciones: " + e.message);
+    }
+    setLdClinicalRecommendations(false);
+  };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
   const startEditReport = () => {
     setEditedReport(report);
@@ -1531,6 +1576,7 @@ ${report}` }],
     setJustification("");
     setDiffDiag("");
     setMindMap("");
+    setClinicalRecommendations("");
     setIsEditingReport(false);
     setEditedReport("");
     setFInput("");
@@ -1979,6 +2025,13 @@ ${report}` }],
               <span style={{ ...S.rt, color: P.chatTitleColor }}>Contexto clínico</span>
               {!!clinicalContextData.hasAny && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
+                  onClick={genClinicalRecommendations}
+                  disabled={ldClinicalRecommendations || !(clinicalContextDraft.trim() || clinicalContextData.structuredText)}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: ldClinicalRecommendations ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
+                >
+                  {ldClinicalRecommendations ? "⏳ Recomendando..." : "🧭 Recomendaciones"}
+                </button>
+                <button
                   onClick={polishClinicalContext}
                   disabled={ldClinicalPolish || !clinicalContextDraft.trim()}
                   style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: ldClinicalPolish ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: ldClinicalPolish ? (isDark ? "#333" : "#ccc") : "linear-gradient(135deg,#6366f1,#4338ca)", color: "#fff" }}
@@ -2003,6 +2056,10 @@ ${report}` }],
                         onChange={(e) => setClinicalContextDraft(e.target.value)}
                         style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 14, lineHeight: 1.5, outline: "none" }}
                       />
+                    </div>
+                    <div style={{ padding: "14px 16px", background: P.recoPanelBg, border: "1px solid " + P.recoPanelBorder, borderRadius: 10 }}>
+                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>Recomendaciones para este caso</div>
+                      <div style={{ whiteSpace: "pre-wrap", color: P.text }}>{clinicalRecommendations || "Genera recomendaciones para ver un listado breve de hallazgos clave a buscar según este contexto clínico."}</div>
                     </div>
                     <div style={{ padding: "14px 16px", background: P.inputBg, border: "1px solid " + P.inputBorder, borderRadius: 10 }}>
                       <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.text2 }}>Motivo de petición original (sin procesar)</div>
