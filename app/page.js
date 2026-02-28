@@ -422,8 +422,9 @@ Formato de salida obligatorio:
 const REPORT_SYS = (c, isDark, processedClinicalContext = "") => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
 ${buildCtxBlock(c)}
 
-## CONTEXTO CLÍNICO PROCESADO (OBLIGATORIO EN LA SALIDA)
-- Al INICIO absoluto del informe, añade un bloque HTML con título "CONTEXTO CLÍNICO PROCESADO".
+## CONTEXTO CLÍNICO (OBLIGATORIO EN LA SALIDA)
+- Al INICIO absoluto del informe, añade una sección HTML con título exacto "CONTEXTO CLÍNICO".
+- Este epígrafe debe tener el mismo rango visual y tipográfico que los encabezados principales del informe (por ejemplo, como "HALLAZGOS" o "CONCLUSIÓN").
 - Debe contener una copia fiel y literal del siguiente contexto clínico ya procesado (sin resumir ni omitir líneas):
 ${processedClinicalContext || "CONTEXTO CLÍNICO:\n- Sin contexto clínico estructurado."}
 - Este bloque debe aparecer antes de la técnica, hallazgos y conclusión.
@@ -448,6 +449,10 @@ Piensa SIEMPRE: ¿este hallazgo normal es relevante para el diagnóstico, estadi
 ## HTML
 <div style="font-family:'Plus Jakarta Sans','Segoe UI',Calibri,sans-serif;line-height:1.7;font-size:14px;">
 <p style="font-weight:bold;font-size:1.15em;margin-bottom:0.3em;">[TIPO ESTUDIO] [URGENTE/CÓDIGO ICTUS]</p>
+<p style="font-weight:bold;margin-top:1.2em;font-size:1.05em;padding-bottom:4px;">CONTEXTO CLÍNICO</p>
+<div style="margin-top:0.8em;">
+<p>[Contexto clínico literal]</p>
+</div>
 <p style="font-size:0.95em;opacity:0.7;">[Técnica]</p>
 <p style="font-size:0.95em;opacity:0.7;">[Referencia previo]</p>
 <p style="font-weight:bold;margin-top:1.2em;font-size:1.05em;padding-bottom:4px;">HALLAZGOS</p>
@@ -2494,7 +2499,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                   onPaste={handleReportEditorPaste}
                   onMouseUp={captureReportSelection}
                   onKeyUp={captureReportSelection}
-                  style={{ border: "1px dashed " + P.goldBorderFocus, borderRadius: 10, padding: isMobile ? 10 : 14, background: P.inputBgFocus, minHeight: 240, outline: "none", whiteSpace: "pre-wrap" }}
+                  style={{ border: "1px dashed " + P.goldBorderFocus, borderRadius: 10, padding: isMobile ? 10 : 14, background: P.inputBgFocus, minHeight: 240, outline: "none", lineHeight: 1.65 }}
                   dangerouslySetInnerHTML={{ __html: editedReport }}
                 />
                 {reportSelectionMenu.visible && <div
