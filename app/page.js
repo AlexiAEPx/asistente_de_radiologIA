@@ -11,11 +11,6 @@ const MODELS = [
 
 const DEFAULT_MODEL_KEY = MODELS[2].key;
 
-const ASSISTANT_MODES = {
-  clinical: "clinical",
-  teaching: "teaching",
-};
-
 // Pricing per million tokens (USD)
 const PRICING = {
   "anthropic:claude-haiku-4-5-20251001":  { input: 0.80, output: 4.00 },
@@ -519,16 +514,11 @@ ${mode === "essential"
 ## RESPUESTA
 Devuelve SOLO HTML del informe completo, sin markdown ni explicaciones.`;
 
-const ANALYSIS_SYS = (c, report, assistantMode = ASSISTANT_MODES.clinical) => `Eres consultor experto en radiología diagnóstica.
+const ANALYSIS_SYS = (c, report) => `Eres consultor experto en radiología diagnóstica.
 ${buildCtxBlock(c)}
 
 ## INFORME ACTUAL
 ${report}
-
-## MODO
-${assistantMode === ASSISTANT_MODES.teaching
-  ? "MODO DOCENTE: permite un tono cercano y recursos didácticos para enseñar razonamiento clínico."
-  : "MODO CLÍNICO: tono estricto, profesional y asistencial. Sin humor, sin sarcasmo y sin adornos innecesarios."}
 
 ## OBJETIVO
 - Prioriza seguridad clínica, coherencia y accionabilidad.
@@ -539,7 +529,7 @@ ${assistantMode === ASSISTANT_MODES.teaching
 ## FORMATO DE SALIDA
 - Devuelve SOLO HTML válido con estilos inline.
 - Estructura mínima: resumen, diferencial con probabilidades, can't miss, recomendaciones priorizadas, perlas de QA.
-- Si el modo es clínico, evita frases coloquiales y mantén estilo sobrio.
+- Mantén un estilo sobrio, profesional y asistencial.
 `;
 
 const CHAT_SYS = (c, report, analysis) => `Eres consultor de radiología experto.
@@ -1066,7 +1056,6 @@ export default function Page() {
   const [report, setReport] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [model, setModel] = useState(DEFAULT_MODEL_KEY);
-  const [assistantMode, setAssistantMode] = useState(ASSISTANT_MODES.clinical);
   const [lTab, setLTab] = useState("context");
   const [rTab, setRTab] = useState("report");
   const [ldReport, setLdReport] = useState(false);
@@ -1648,7 +1637,7 @@ ${report}` }],
   };
   const genAnalysis = async (focusTab = true) => {
     if (!report || ldAnalysis) return; setLdAnalysis(true); setErr(""); if (focusTab) setRTab("analysis");
-    try { const nextAnalysis = clean(await callAPI(ANALYSIS_SYS(ctx, report, assistantMode), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }])); setAnalysis(nextAnalysis);
+    try { const nextAnalysis = clean(await callAPI(ANALYSIS_SYS(ctx, report), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }])); setAnalysis(nextAnalysis);
     setTabSignatures(prev => ({ ...prev, analysis: tabInputsSignature.analysis })); }
     catch (e) { setErr("Error análisis: " + e.message); } setLdAnalysis(false);
   };
@@ -1972,11 +1961,9 @@ ${instruction}`;
     { key: "clinicalContext", icon: "🩺", label: "Contexto clínico", run: null, loading: false, canRun: false },
     { key: "report", icon: "📄", label: "Informe", run: null, loading: ldReport, canRun: false },
     { key: "analysis", icon: "🔍", label: "Análisis", run: () => genAnalysis(false), loading: ldAnalysis, canRun: !!report },
-    ...(assistantMode === ASSISTANT_MODES.teaching ? [
-      { key: "keyIdeas", icon: "💡", label: "Ideas Clave", run: () => genKeyIdeas(false), loading: ldKeyIdeas, canRun: !!report },
-      { key: "diffDiag", icon: "🚦", label: "Diferencial", run: () => genDiffDiag(false), loading: ldDiffDiag, canRun: !!report },
-      { key: "mindMap", icon: "🧠", label: "Mapa Mental", run: () => genMindMap(false), loading: ldMindMap, canRun: !!report },
-    ] : []),
+    { key: "keyIdeas", icon: "💡", label: "Ideas Clave", run: () => genKeyIdeas(false), loading: ldKeyIdeas, canRun: !!report },
+    { key: "diffDiag", icon: "🚦", label: "Diferencial", run: () => genDiffDiag(false), loading: ldDiffDiag, canRun: !!report },
+    { key: "mindMap", icon: "🧠", label: "Mapa Mental", run: () => genMindMap(false), loading: ldMindMap, canRun: !!report },
     { key: "justification", icon: "❓", label: "¿Justificada?", run: () => genJustification(false), loading: ldJustification, canRun: !!clinicalContextData.hasAny },
   ];
 
@@ -2138,11 +2125,6 @@ ${instruction}`;
                 </div>
               </div>
             </>}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 8, border: "1px solid " + P.goldBorder, background: P.goldBg }}>
-            <span style={{ fontSize: 11, color: P.text3, fontWeight: 700 }}>Modo</span>
-            <button onClick={() => setAssistantMode(ASSISTANT_MODES.clinical)} style={{ ...S.clr, padding: "3px 8px", background: assistantMode === ASSISTANT_MODES.clinical ? P.goldBgActive : "transparent" }}>Clínico</button>
-            <button onClick={() => setAssistantMode(ASSISTANT_MODES.teaching)} style={{ ...S.clr, padding: "3px 8px", background: assistantMode === ASSISTANT_MODES.teaching ? P.goldBgActive : "transparent" }}>Docente</button>
           </div>
           <button onClick={() => setStoreHistoryLocal(v => !v)} style={S.clr}>
             {storeHistoryLocal ? "Historial local: ON" : "Historial local: OFF"}
