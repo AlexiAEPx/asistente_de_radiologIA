@@ -134,6 +134,14 @@ const getPriorityLabel = (priority) => {
   return codeLabels[priority] || priority.toUpperCase();
 };
 
+const buildTabSignatures = ({ clinicalContextData, report, analysis, fMsgs, cMsgs }) => ({
+  analysis: JSON.stringify({ report, ctx: clinicalContextData.structuredText || "", findingsCount: (fMsgs || []).length, chatCount: (cMsgs || []).length }),
+  keyIdeas: JSON.stringify({ report, analysis, ctx: clinicalContextData.structuredText || "" }),
+  justification: JSON.stringify({ clinicalContext: clinicalContextData.structuredText || "", report }),
+  diffDiag: JSON.stringify({ report, analysis, ctx: clinicalContextData.structuredText || "" }),
+  mindMap: JSON.stringify({ report, analysis, ctx: clinicalContextData.structuredText || "" }),
+});
+
 const buildCtxBlock = (c) => {
   const p = [];
   if (c.freeText) p.push("Información clínica general (sin clasificar):\n" + c.freeText);
@@ -785,7 +793,7 @@ function LoadingDots({ text }) {
   );
 }
 
-function Tab({ active, icon, label, status, onClick, onRun, canRun, isRunning, P, compact }) {
+function Tab({ active, icon, label, status, stale, onClick, onRun, canRun, isRunning, P, compact }) {
   return (
     <button onClick={onClick} style={{
       display: "flex", alignItems: "center", gap: compact ? 3 : 5, padding: compact ? "7px 9px" : "9px 14px",
@@ -797,7 +805,7 @@ function Tab({ active, icon, label, status, onClick, onRun, canRun, isRunning, P
       flexShrink: 0, borderRadius: 10, boxShadow: active ? "0 8px 18px rgba(0,0,0,0.12)" : "none",
     }}>
       <span>{icon}</span><span>{label}</span>
-      {status && <span title={status === "unread" ? "Nuevo pendiente de revisar" : "Ya revisado"} style={{ width: 8, height: 8, borderRadius: "50%", background: status === "unread" ? "#22c55e" : "#fff", border: "1px solid " + (status === "unread" ? "#16a34a" : "rgba(255,255,255,0.6)") }} />}
+      {(status || stale) && <span title={stale ? "Hay nueva información: conviene reprocesar esta pestaña" : status === "unread" ? "Nuevo pendiente de revisar" : "Ya revisado"} style={{ width: 8, height: 8, borderRadius: "50%", background: stale ? "#f59e0b" : status === "unread" ? "#22c55e" : "#fff", border: "1px solid " + (stale ? "#d97706" : status === "unread" ? "#16a34a" : "rgba(255,255,255,0.6)") }} />}
       {onRun && (
         <span
           role="button"
@@ -1092,9 +1100,11 @@ export default function Page() {
     diffDiag: "idle",
     mindMap: "idle",
   });
+  const [tabSignatures, setTabSignatures] = useState({ analysis: "", keyIdeas: "", justification: "", diffDiag: "", mindMap: "" });
   const rightTabbarRef = useRef(null);
 
   const clinicalContextData = useMemo(() => buildClinicalContextData(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
+  const tabInputsSignature = useMemo(() => buildTabSignatures({ clinicalContextData, report, analysis, ctx, fMsgs, cMsgs }), [clinicalContextData, report, analysis, ctx, fMsgs, cMsgs]);
   const [clinicalContextDraft, setClinicalContextDraft] = useState("");
   const [ldClinicalPolish, setLdClinicalPolish] = useState(false);
   const [clinicalRecommendations, setClinicalRecommendations] = useState("");
@@ -1388,6 +1398,7 @@ export default function Page() {
     model,
     spending,
     tabStatus,
+    tabSignatures,
     showClinicalHistory,
     showPriorRadiology,
     showClinicalReports,
@@ -1432,6 +1443,7 @@ export default function Page() {
     setModel(snap.model || DEFAULT_MODEL_KEY);
     setSpending(snap.spending || { totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
     setTabStatus(snap.tabStatus || { clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
+    setTabSignatures(snap.tabSignatures || { analysis: "", keyIdeas: "", justification: "", diffDiag: "", mindMap: "" });
     setShowClinicalHistory(!!snap.showClinicalHistory);
     setShowPriorRadiology(!!snap.showPriorRadiology);
     setShowClinicalReports(!!snap.showClinicalReports);
@@ -1583,7 +1595,8 @@ ${report}` }],
   };
   const genAnalysis = async (focusTab = true) => {
     if (!report || ldAnalysis) return; setLdAnalysis(true); setErr(""); if (focusTab) setRTab("analysis");
-    try { setAnalysis(clean(await callAPI(ANALYSIS_SYS(ctx, report), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }]))); }
+    try { const nextAnalysis = clean(await callAPI(ANALYSIS_SYS(ctx, report), [{ role: "user", content: "Analiza este caso radiológico de forma exhaustiva." }])); setAnalysis(nextAnalysis);
+    setTabSignatures(prev => ({ ...prev, analysis: tabInputsSignature.analysis })); }
     catch (e) { setErr("Error análisis: " + e.message); } setLdAnalysis(false);
   };
   const sendChat = async () => {
@@ -1598,22 +1611,26 @@ ${report}` }],
   };
   const genKeyIdeas = async (focusTab = true) => {
     if (!report || ldKeyIdeas) return; setLdKeyIdeas(true); setErr(""); if (focusTab) setRTab("keyIdeas");
-    try { setKeyIdeas(clean(await callAPI(KEY_IDEAS_SYS(ctx, report, analysis), [{ role: "user", content: "Genera las 10 ideas clave de este caso radiológico." }]))); }
+    try { const nextKeyIdeas = clean(await callAPI(KEY_IDEAS_SYS(ctx, report, analysis), [{ role: "user", content: "Genera las 10 ideas clave de este caso radiológico." }])); setKeyIdeas(nextKeyIdeas);
+    setTabSignatures(prev => ({ ...prev, keyIdeas: tabInputsSignature.keyIdeas })); }
     catch (e) { setErr("Error ideas clave: " + e.message); } setLdKeyIdeas(false);
   };
   const genJustification = async (focusTab = true) => {
     if (!clinicalContextData.hasAny || ldJustification) return; setLdJustification(true); setErr(""); if (focusTab) setRTab("justification");
-    try { setJustification(clean(await callAPI(JUSTIFICATION_SYS(ctx, report), [{ role: "user", content: "Analiza la justificación de esta prueba radiológica." }]))); }
+    try { const nextJustification = clean(await callAPI(JUSTIFICATION_SYS(ctx, report), [{ role: "user", content: "Analiza la justificación de esta prueba radiológica." }])); setJustification(nextJustification);
+    setTabSignatures(prev => ({ ...prev, justification: tabInputsSignature.justification })); }
     catch (e) { setErr("Error justificación: " + e.message); } setLdJustification(false);
   };
   const genDiffDiag = async (focusTab = true) => {
     if (!report || ldDiffDiag) return; setLdDiffDiag(true); setErr(""); if (focusTab) setRTab("diffDiag");
-    try { setDiffDiag(clean(await callAPI(DIFF_DIAG_SYS(ctx, report, analysis), [{ role: "user", content: "Genera el diagnóstico diferencial con código semáforo para este caso." }]))); }
+    try { const nextDiffDiag = clean(await callAPI(DIFF_DIAG_SYS(ctx, report, analysis), [{ role: "user", content: "Genera el diagnóstico diferencial con código semáforo para este caso." }])); setDiffDiag(nextDiffDiag);
+    setTabSignatures(prev => ({ ...prev, diffDiag: tabInputsSignature.diffDiag })); }
     catch (e) { setErr("Error diagnóstico diferencial: " + e.message); } setLdDiffDiag(false);
   };
   const genMindMap = async (focusTab = true) => {
     if (!report || ldMindMap) return; setLdMindMap(true); setErr(""); if (focusTab) setRTab("mindMap");
-    try { setMindMap(clean(await callAPI(MIND_MAP_SYS(ctx, report, analysis), [{ role: "user", content: "Genera un mapa mental visual completo de este caso radiológico." }]))); }
+    try { const nextMindMap = clean(await callAPI(MIND_MAP_SYS(ctx, report, analysis), [{ role: "user", content: "Genera un mapa mental visual completo de este caso radiológico." }])); setMindMap(nextMindMap);
+    setTabSignatures(prev => ({ ...prev, mindMap: tabInputsSignature.mindMap })); }
     catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
   };
 
@@ -1726,6 +1743,7 @@ ${report}` }],
     setLdReportAdjust(false);
     setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
     setTabStatus({ clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
+    setTabSignatures({ analysis: "", keyIdeas: "", justification: "", diffDiag: "", mindMap: "" });
     setShowExport(false);
     setCloseAfterExport(false);
     setShowHistory(false);
@@ -1784,6 +1802,14 @@ ${report}` }],
   useEffect(() => { setTabSeenState("diffDiag", !!diffDiag); }, [diffDiag, rTab]);
   useEffect(() => { setTabSeenState("mindMap", !!mindMap); }, [mindMap, rTab]);
 
+  const staleTabs = useMemo(() => ({
+    analysis: !!analysis && !!tabSignatures.analysis && tabSignatures.analysis !== tabInputsSignature.analysis,
+    keyIdeas: !!keyIdeas && !!tabSignatures.keyIdeas && tabSignatures.keyIdeas !== tabInputsSignature.keyIdeas,
+    justification: !!justification && !!tabSignatures.justification && tabSignatures.justification !== tabInputsSignature.justification,
+    diffDiag: !!diffDiag && !!tabSignatures.diffDiag && tabSignatures.diffDiag !== tabInputsSignature.diffDiag,
+    mindMap: !!mindMap && !!tabSignatures.mindMap && tabSignatures.mindMap !== tabInputsSignature.mindMap,
+  }), [analysis, keyIdeas, justification, diffDiag, mindMap, tabSignatures, tabInputsSignature]);
+
   const scrollRightTabs = (delta) => {
     if (!rightTabbarRef.current) return;
     rightTabbarRef.current.scrollBy({ left: delta, behavior: "smooth" });
@@ -1794,7 +1820,7 @@ ${report}` }],
     { key: "report", icon: "📄", label: "Informe", run: null, loading: ldReport, canRun: false },
     { key: "analysis", icon: "🔍", label: "Análisis", run: () => genAnalysis(false), loading: ldAnalysis, canRun: !!report },
     { key: "keyIdeas", icon: "💡", label: "Ideas Clave", run: () => genKeyIdeas(false), loading: ldKeyIdeas, canRun: !!report },
-    { key: "justification", icon: "❓", label: "¿Justificada?", run: () => genJustification(false), loading: ldJustification, canRun: !!report },
+    { key: "justification", icon: "❓", label: "¿Justificada?", run: () => genJustification(false), loading: ldJustification, canRun: !!clinicalContextData.hasAny },
     { key: "diffDiag", icon: "🚦", label: "Diferencial", run: () => genDiffDiag(false), loading: ldDiffDiag, canRun: !!report },
     { key: "mindMap", icon: "🧠", label: "Mapa Mental", run: () => genMindMap(false), loading: ldMindMap, canRun: !!report },
   ];
@@ -2193,6 +2219,7 @@ ${report}` }],
                   icon={t.icon}
                   label={t.label}
                   status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
+                  stale={!!staleTabs[t.key]}
                   onClick={() => openRightTab(t.key)}
                   onRun={t.run}
                   canRun={t.canRun}
