@@ -543,6 +543,12 @@ ${report ? "\n## INFORME\n" + report : ""}
 ${analysis ? "\n## ANÁLISIS\n" + analysis : ""}
 Responde directo, profesional. HTML para complejas, texto para breves. Español.`;
 
+const REPORT_SELECTION_SYS = `Eres un asistente experto en edición de informes radiológicos.
+- Recibirás un TEXTO SELECCIONADO de un informe y una INSTRUCCIÓN del usuario.
+- Si la instrucción pide transformar/reescribir ese texto, devuelve SOLO el texto editado (sin comillas, sin markdown, sin explicaciones).
+- Si la instrucción es una pregunta o aclaración, responde de forma breve y clara en español.
+- No inventes hallazgos nuevos; mantén el sentido clínico del fragmento original salvo que el usuario pida explícitamente reformular el estilo.`;
+
 
 const KEY_IDEAS_SYS = (c, report, analysis) => `Eres consultor experto en radiología diagnóstica. A partir del informe y análisis del caso, genera exactamente 10 ideas clave que un radiólogo debe llevarse de este caso. Genera HTML profesional con estilos inline. JUEGA CON EL FORMATO: usa negritas, MAYÚSCULAS, subrayados, tamaños variados y colores para que la lectura sea ágil y visualmente atractiva.
 ${buildCtxBlock(c)}
@@ -972,7 +978,7 @@ function MultiEntryGroup({ entries, onChange, label, singularLabel, placeholder,
                       onClick={() => removeImage(idx, imageIdx)}
                       title="Eliminar imagen"
                       style={{
-                        position: "absolute", top: -6, right: -6, borderRadius: 999, border: "none", width: 18, height: 18,
+                        position: "fixed", top: -6, right: -6, borderRadius: 999, border: "none", width: 18, height: 18,
                         background: P.errorText, color: "#fff", fontSize: 11, lineHeight: 1, cursor: "pointer",
                       }}
                     >✕</button>
@@ -1069,6 +1075,10 @@ export default function Page() {
   const [ldMindMap, setLdMindMap] = useState(false);
   const [isEditingReport, setIsEditingReport] = useState(false);
   const [editedReport, setEditedReport] = useState("");
+  const [reportSelectionMenu, setReportSelectionMenu] = useState(null);
+  const [selectedReportText, setSelectedReportText] = useState("");
+  const [selectionPrompt, setSelectionPrompt] = useState("");
+  const [ldSelectionAI, setLdSelectionAI] = useState(false);
   const [copied, setCopied] = useState("");
   const [err, setErr] = useState("");
   const [showMP, setShowMP] = useState(false);
@@ -1462,6 +1472,7 @@ export default function Page() {
   const cInpRef = useRef(null);
   const reportEditorRef = useRef(null);
   const reportViewRef = useRef(null);
+  const lastRangeRef = useRef(null);
 
   useEffect(() => {
     if (!isEditingReport) setEditedReport(report);
@@ -1469,6 +1480,24 @@ export default function Page() {
 
   useEffect(() => { fEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [fMsgs, ldReport]);
   useEffect(() => { cEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [cMsgs, ldChat]);
+
+  useEffect(() => {
+    const handlePointerDown = (e) => {
+      if (!reportSelectionMenu) return;
+      const menuNode = document.getElementById("report-selection-menu");
+      if (menuNode && menuNode.contains(e.target)) return;
+      setReportSelectionMenu(null);
+    };
+    const handleEscape = (e) => {
+      if (e.key === "Escape") closeSelectionMenu();
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [reportSelectionMenu]);
 
   useEffect(() => {
     const onMove = (e) => {
@@ -1665,10 +1694,12 @@ ${report}` }],
   const startEditReport = () => {
     setEditedReport(report);
     setIsEditingReport(true);
+    closeSelectionMenu();
   };
   const cancelEditReport = () => {
     setEditedReport(report);
     setIsEditingReport(false);
+    closeSelectionMenu();
   };
   const exportCaseAsMarkdown = () => {
     const payload = buildExportPayload();
@@ -1689,11 +1720,120 @@ ${report}` }],
     if (shouldClose) clearAll();
   };
 
+  const closeSelectionMenu = () => {
+    setReportSelectionMenu(null);
+    setSelectedReportText("");
+    setSelectionPrompt("");
+    lastRangeRef.current = null;
+  };
+  const handleReportSelection = () => {
+    if (!isEditingReport || !reportEditorRef.current) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      setReportSelectionMenu(null);
+      return;
+    }
+    const txt = sel.toString().trim();
+    if (!txt) {
+      setReportSelectionMenu(null);
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    if (!reportEditorRef.current.contains(range.commonAncestorContainer)) {
+      setReportSelectionMenu(null);
+      return;
+    }
+    const rect = range.getBoundingClientRect();
+    lastRangeRef.current = range.cloneRange();
+    setSelectedReportText(txt);
+    setSelectionPrompt("");
+    setReportSelectionMenu({
+      top: rect.bottom + 8,
+      left: rect.left,
+    });
+  };
+  const restoreSelectionRange = () => {
+    if (!lastRangeRef.current) return false;
+    const sel = window.getSelection();
+    if (!sel) return false;
+    sel.removeAllRanges();
+    sel.addRange(lastRangeRef.current);
+    return true;
+  };
+  const applySelectionEdit = async (instruction) => {
+    const prompt = instruction.trim();
+    if (!prompt || !selectedReportText || ldSelectionAI) return;
+    setErr("");
+    setLdSelectionAI(true);
+    try {
+      const response = (await callAPI(
+        REPORT_SELECTION_SYS,
+        [{ role: "user", content: `INSTRUCCIÓN:
+${prompt}
+
+TEXTO SELECCIONADO:
+${selectedReportText}` }],
+        700
+      )).trim();
+
+      if (!response) {
+        throw new Error("La IA no devolvió contenido");
+      }
+
+      if (restoreSelectionRange()) {
+        const sel = window.getSelection();
+        if (sel?.rangeCount) {
+          sel.deleteFromDocument();
+          const range = sel.getRangeAt(0);
+          const textNode = document.createTextNode(response);
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.collapse(true);
+          sel.removeAllRanges();
+        }
+      }
+
+      const html = reportEditorRef.current?.innerHTML ?? editedReport;
+      setEditedReport(html);
+      setReport(html);
+      setCMsgs((prev) => ([
+        ...prev,
+        { role: "user", content: `🧩 Edición sobre selección: ${prompt}` },
+        { role: "assistant", content: response },
+      ]));
+      closeSelectionMenu();
+    } catch (e) {
+      setErr("Error al editar selección: " + e.message);
+    }
+    setLdSelectionAI(false);
+  };
+  const askSelectionInChat = async () => {
+    const prompt = selectionPrompt.trim();
+    if (!prompt || !selectedReportText || ldSelectionAI) return;
+    setErr("");
+    const userMsg = `Sobre este texto seleccionado:
+"${selectedReportText}"
+
+${prompt}`;
+    const nm = [...cMsgs, { role: "user", content: userMsg }];
+    setCMsgs(nm);
+    setSelectionPrompt("");
+    setLdSelectionAI(true);
+    try {
+      const response = await callAPI(CHAT_SYS(ctx, report, analysis), nm, 1200);
+      setCMsgs((prev) => [...prev, { role: "assistant", content: response }]);
+    } catch (e) {
+      setErr("Error consulta selección: " + e.message);
+    }
+    setLdSelectionAI(false);
+  };
+
   const saveEditedReport = () => {
     const html = reportEditorRef.current?.innerHTML ?? editedReport;
     setReport(html);
     setEditedReport(html);
     setIsEditingReport(false);
+    closeSelectionMenu();
     setTimeout(() => {
       try { exportCaseAsPdf(); }
       catch (e) { setErr("No se pudo exportar el PDF automáticamente: " + e.message); }
@@ -1712,6 +1852,7 @@ ${report}` }],
     setClinicalRecommendations("");
     setIsEditingReport(false);
     setEditedReport("");
+    closeSelectionMenu();
     setFInput("");
     setCInput("");
     setErr("");
@@ -2300,9 +2441,69 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                   contentEditable
                   suppressContentEditableWarning
                   onInput={(e) => setEditedReport(e.currentTarget.innerHTML)}
+                  onMouseUp={handleReportSelection}
+                  onKeyUp={handleReportSelection}
+                  onTouchEnd={handleReportSelection}
                   style={{ border: "1px dashed " + P.goldBorderFocus, borderRadius: 10, padding: isMobile ? 10 : 14, background: P.inputBgFocus, minHeight: 240, outline: "none" }}
                   dangerouslySetInnerHTML={{ __html: editedReport }}
                 />
+                {reportSelectionMenu && <div
+                  id="report-selection-menu"
+                  style={{
+                    position: "fixed",
+                    top: reportSelectionMenu.top,
+                    left: reportSelectionMenu.left,
+                    zIndex: 250,
+                    width: isMobile ? "min(92vw, 360px)" : 360,
+                    background: P.bg2,
+                    border: "1px solid " + P.goldBorder,
+                    borderRadius: 10,
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
+                    padding: 10,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: P.text2, marginBottom: 6 }}>Selección activa</div>
+                  <div style={{ fontSize: 12, color: P.text3, marginBottom: 8, maxHeight: 64, overflow: "auto", padding: "6px 8px", borderRadius: 6, background: P.inputBg }}>
+                    {selectedReportText}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    {["Acorta esta frase", "Hazlo esquemático", "Hazlo más formal"].map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() => applySelectionEdit(preset)}
+                        disabled={ldSelectionAI}
+                        style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, cursor: ldSelectionAI ? "wait" : "pointer", fontSize: 11, fontWeight: 700 }}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={selectionPrompt}
+                    onChange={(e) => setSelectionPrompt(e.target.value)}
+                    placeholder="Pide una edición o haz una pregunta sobre esta selección..."
+                    style={{ width: "100%", minHeight: 64, resize: "vertical", borderRadius: 8, border: "1px solid " + P.inputBorder, background: P.inputBg, color: P.text, padding: "8px 10px", fontFamily: "inherit", fontSize: 12, outline: "none" }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 8 }}>
+                    <button onClick={closeSelectionMenu} style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: P.text2, cursor: "pointer", fontSize: 12 }}>Cerrar</button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={askSelectionInChat}
+                        disabled={ldSelectionAI || !selectionPrompt.trim()}
+                        style={{ padding: "6px 10px", borderRadius: 7, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatTitleColor, cursor: ldSelectionAI ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}
+                      >
+                        {ldSelectionAI ? "⏳" : "💬 Preguntar"}
+                      </button>
+                      <button
+                        onClick={() => applySelectionEdit(selectionPrompt)}
+                        disabled={ldSelectionAI || !selectionPrompt.trim()}
+                        style={{ padding: "6px 10px", borderRadius: 7, border: "none", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", cursor: ldSelectionAI ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}
+                      >
+                        {ldSelectionAI ? "⏳ Editando" : "✨ Aplicar"}
+                      </button>
+                    </div>
+                  </div>
+                </div>}
               </div> : <div ref={reportViewRef} dangerouslySetInnerHTML={{ __html: report }} />) : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
             {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal vinculado"], [isDark ? "#aaa" : "#444", "Relleno"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
