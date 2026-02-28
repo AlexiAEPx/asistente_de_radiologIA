@@ -2,17 +2,25 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 
 const MODELS = [
-  { id: "claude-haiku-4-5-20251001", label: "Haiku", cost: "💰", desc: "Rápido" },
-  { id: "claude-sonnet-4-20250514", label: "Sonnet", cost: "💰💰", desc: "Equilibrado" },
-  { id: "claude-opus-4-6", label: "Opus", cost: "💰💰💰", desc: "Máxima calidad" },
+  { key: "anthropic:claude-haiku-4-5-20251001", provider: "anthropic", id: "claude-haiku-4-5-20251001", label: "Claude Haiku", cost: "💰", desc: "Rápido y barato" },
+  { key: "openai:gpt-4o-mini", provider: "openai", id: "gpt-4o-mini", label: "GPT-4o mini", cost: "💰", desc: "Muy económico" },
+  { key: "anthropic:claude-sonnet-4-20250514", provider: "anthropic", id: "claude-sonnet-4-20250514", label: "Claude Sonnet", cost: "💰💰", desc: "Equilibrado" },
+  { key: "openai:gpt-4o", provider: "openai", id: "gpt-4o", label: "GPT-4o", cost: "💰💰💰", desc: "Calidad alta" },
+  { key: "anthropic:claude-opus-4-6", provider: "anthropic", id: "claude-opus-4-6", label: "Claude Opus", cost: "💰💰💰", desc: "Máxima calidad" },
 ];
 
-// Pricing per million tokens (USD) — https://docs.anthropic.com/en/docs/about-claude/pricing
+const DEFAULT_MODEL_KEY = MODELS[2].key;
+
+// Pricing per million tokens (USD)
 const PRICING = {
-  "claude-haiku-4-5-20251001":  { input: 0.80, output: 4.00 },
-  "claude-sonnet-4-20250514":   { input: 3.00, output: 15.00 },
-  "claude-opus-4-6":            { input: 15.00, output: 75.00 },
+  "anthropic:claude-haiku-4-5-20251001":  { input: 0.80, output: 4.00 },
+  "anthropic:claude-sonnet-4-20250514":   { input: 3.00, output: 15.00 },
+  "anthropic:claude-opus-4-6":            { input: 15.00, output: 75.00 },
+  "openai:gpt-4o-mini":                    { input: 0.15, output: 0.60 },
+  "openai:gpt-4o":                         { input: 2.50, output: 10.00 },
 };
+
+const getModelByKey = (key) => MODELS.find((m) => m.key === key) || MODELS.find((m) => m.key === DEFAULT_MODEL_KEY) || MODELS[0];
 
 const palette = (dark) => dark ? {
   bg: "#0e0e18", bg2: "#111120", bg3: "#1a1a2e",
@@ -935,7 +943,7 @@ export default function Page() {
   const [cInput, setCInput] = useState("");
   const [report, setReport] = useState("");
   const [analysis, setAnalysis] = useState("");
-  const [model, setModel] = useState(MODELS[1].id);
+  const [model, setModel] = useState(DEFAULT_MODEL_KEY);
   const [lTab, setLTab] = useState("context");
   const [rTab, setRTab] = useState("report");
   const [ldReport, setLdReport] = useState(false);
@@ -1280,7 +1288,7 @@ export default function Page() {
     setCInput(snap.cInput || "");
     setLTab(snap.lTab || "context");
     setRTab(snap.rTab || "report");
-    setModel(snap.model || MODELS[1].id);
+    setModel(snap.model || DEFAULT_MODEL_KEY);
     setSpending(snap.spending || { totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
     setTabStatus(snap.tabStatus || { clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
     setShowClinicalHistory(!!snap.showClinicalHistory);
@@ -1364,7 +1372,7 @@ export default function Page() {
     const r = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: mt, system: sys, messages: apiMessages }),
+      body: JSON.stringify({ provider: selectedModel.provider, model: selectedModel.id, max_tokens: mt, system: sys, messages: apiMessages }),
     });
     if (!r.ok) {
       const errData = await r.json().catch(() => ({}));
@@ -1374,7 +1382,7 @@ export default function Page() {
     const text = (d.content || []).map(b => b.text || "").join("");
     // Track spending from usage data returned by the Anthropic API
     if (d.usage) {
-      const p = PRICING[model] || PRICING["claude-sonnet-4-20250514"];
+      const p = PRICING[selectedModel.key] || PRICING[DEFAULT_MODEL_KEY];
       const inTok = d.usage.input_tokens || 0;
       const outTok = d.usage.output_tokens || 0;
       const cost = (inTok * p.input + outTok * p.output) / 1_000_000;
@@ -1574,7 +1582,8 @@ ${report}` }],
     { key: "mindMap", icon: "🧠", label: "Mapa Mental", run: () => genMindMap(false), loading: ldMindMap, canRun: !!report },
   ];
 
-  const sm = MODELS.find(m => m.id === model);
+  const selectedModel = getModelByKey(model);
+  const sm = selectedModel;
   const S = {
     root: { display: "flex", flexDirection: "column", height: isMobile ? "auto" : "100vh", minHeight: isMobile ? "100vh" : undefined, width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: isMobile ? "auto" : "hidden", transition: "background 0.3s, color 0.3s" },
     hdr: { display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: isMobile ? "8px 12px" : "10px 18px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: isMobile ? 6 : 10, flexWrap: "wrap" },
@@ -1673,7 +1682,7 @@ ${report}` }],
           <div style={{ position: "relative" }}>
             <button onClick={() => setShowMP(!showMP)} style={S.mBtn}>{sm?.cost} {sm?.label} ▾</button>
             {showMP && <div style={S.mDrop}>{MODELS.map(m => (
-              <div key={m.id} style={S.mOpt(m.id === model)} onClick={() => { setModel(m.id); setShowMP(false); }}><span>{m.cost} {m.label}</span><span style={{ fontSize: 11, opacity: 0.6 }}>{m.desc}</span></div>
+              <div key={m.id} style={S.mOpt(m.key === model)} onClick={() => { setModel(m.key); setShowMP(false); }}><span>{m.cost} {m.label}</span><span style={{ fontSize: 11, opacity: 0.6 }}>{m.desc}</span></div>
             ))}</div>}
           </div>
           <div style={{ position: "relative" }}>
