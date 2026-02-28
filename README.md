@@ -70,3 +70,14 @@ En ~1 minuto: `https://asistente-radiologia-XXXX.vercel.app`
 - API keys solo en servidor (nunca llegan al navegador)
 - Repo privado
 - Vercel cifra variables de entorno en reposo
+
+## API JSON-first (PR1)
+
+Nuevos endpoints backend con contratos validados de entrada/salida:
+
+- `POST /api/analyze-request`
+- `POST /api/generate-report`
+- `POST /api/check-report`
+- `POST /api/teaching`
+
+`/api/chat` se mantiene temporalmente por compatibilidad y devuelve aviso de deprecación.
