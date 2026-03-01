@@ -144,7 +144,7 @@ const buildTabSignatures = ({ clinicalContextData, report, analysis, fMsgs, cMsg
 
 const TAB_UI_META = {
   petition: { label: "Petición", color: "#22c55e" },
-  report: { label: "Informe", color: "#c4973c" },
+  report: { label: "Informe", color: "#ef4444" },
   analysis: { label: "Análisis", color: "#0ea5e9" },
 };
 
@@ -2151,6 +2151,9 @@ ${instruction}`;
   const tabAccent = activeTabMeta.color;
   const tabSurfaceBg = `linear-gradient(180deg, ${hexToRgba(tabAccent, isDark ? 0.14 : 0.1)} 0%, ${hexToRgba(tabAccent, isDark ? 0.06 : 0.04)} 42%, transparent 100%)`;
   const tabSurfaceBorder = hexToRgba(tabAccent, isDark ? 0.35 : 0.3);
+  const linkedPanelBg = `linear-gradient(180deg, ${hexToRgba(tabAccent, isDark ? 0.2 : 0.16)} 0%, ${hexToRgba(tabAccent, isDark ? 0.1 : 0.08)} 60%, ${hexToRgba(tabAccent, isDark ? 0.08 : 0.06)} 100%)`;
+  const linkedCardBg = isDark ? hexToRgba("#ffffff", 0.08) : hexToRgba("#ffffff", 0.78);
+  const linkedHeaderBg = isDark ? hexToRgba(tabAccent, 0.26) : hexToRgba(tabAccent, 0.2);
   const S = {
     root: { display: "flex", flexDirection: "column", height: isMobile ? "auto" : "100vh", minHeight: isMobile ? "100vh" : undefined, width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: isMobile ? "auto" : "hidden", transition: "background 0.3s, color 0.3s" },
     hdr: { display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: isMobile ? "8px 12px" : "10px 18px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: isMobile ? 6 : 10, flexWrap: "wrap" },
@@ -2195,7 +2198,7 @@ ${instruction}`;
     ht: { fontSize: 10, color: P.text4, marginTop: 3 },
     rh: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "8px 10px" : "9px 14px", borderBottom: "1px solid " + P.reportHeaderBorder, background: P.reportHeader, flexShrink: 0, flexWrap: "wrap", gap: 5 },
     rt: { fontSize: isMobile ? 12 : 13, fontWeight: 600, color: P.reportTitleColor, letterSpacing: 0.5, textTransform: "uppercase" },
-    rc: { flex: 1, overflowY: "auto", padding: isMobile ? "14px 12px" : "20px 24px", background: P.reportBg, color: P.text },
+    rc: { flex: 1, overflowY: "auto", padding: isMobile ? "14px 12px" : "20px 24px", background: linkedPanelBg, color: P.text },
     cb: (v, a) => ({ padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: a ? "#22c55e" : v === "p" ? P.gold : P.goldBg, color: a ? "#fff" : v === "p" ? "#fff" : P.gold }),
     aiMiniBtn: (disabled, bg) => ({ width: 32, height: 32, minWidth: 32, borderRadius: 8, border: "none", cursor: disabled ? "not-allowed" : "pointer", fontSize: 16, fontWeight: 700, fontFamily: "inherit", background: bg, color: "#fff", opacity: disabled ? 0.55 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }),
     lg: { display: "flex", gap: 10, flexWrap: "wrap", padding: "7px 14px", borderTop: "1px solid " + P.legendBorder, background: P.legendBg, flexShrink: 0 },
@@ -2388,49 +2391,49 @@ ${instruction}`;
               />
             ))}
           </div>
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid " + tabSurfaceBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: hexToRgba(tabAccent, isDark ? 0.1 : 0.05) }}>
+          <div style={{ padding: "8px 12px", borderBottom: "1px solid " + tabSurfaceBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: linkedHeaderBg }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeTabMeta.color, boxShadow: `0 0 0 2px ${P.bg}` }} />
-            Chat vinculado a: <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
+            <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
           </div>
           {rTab === "petition" ? (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-              <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Chat de petición</span></div>
-              <div style={{ ...S.ca, background: P.chatPanelBg }}>
+              <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Chat de petición</span></div>
+              <div style={{ ...S.ca, background: linkedPanelBg }}>
                 {pMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Añade contexto clínico</div><div style={S.phD}>Todo lo que escribas aquí se incorpora a la petición.</div></div>}
                 {pMsgs.map((m, i) => m.role === "user" ? <div key={i} style={{ ...S.ub, background: P.chatBubbleUser }}>{m.content}</div> : <div key={i} style={{ ...S.ab, background: P.chatBubbleAsst, borderColor: P.chatBubbleAsstBorder, color: P.chatBubbleText }}>{m.content}</div>)}
                 {ldPetitionChat && <div style={S.ab}><LoadingDots text="Guardando contexto..." /></div>}
                 <div ref={pEndRef} />
               </div>
-              <div style={{ ...S.ia, background: P.chatInputAreaBg }}><div style={S.ir}>
+              <div style={{ ...S.ia, background: linkedPanelBg }}><div style={S.ir}>
                 <textarea ref={pInpRef} value={pInput} onChange={e => setPInput(e.target.value)} onKeyDown={e => hk(e, sendPetitionChat)} onFocus={() => setFf("pc")} onBlur={() => setFf("")} placeholder="Motivo, antecedentes, datos clínicos..." style={{ ...S.ta(ff === "pc"), borderColor: ff === "pc" ? P.chatInputBorderFocus : P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor }} rows={2} disabled={ldPetitionChat} />
                 <button onClick={sendPetitionChat} disabled={ldPetitionChat || !pInput.trim()} style={{ ...S.sb(ldPetitionChat || !pInput.trim()), background: ldPetitionChat || !pInput.trim() ? (isDark ? "#333" : "#ccc") : P.chatSendBg }}>▶</button>
               </div></div>
             </div>
           ) : rTab === "report" ? (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-              <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Chat de informe</span></div>
-              <div style={{ ...S.ca, background: P.chatPanelBg }}>
+              <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Chat de informe</span></div>
+              <div style={{ ...S.ca, background: linkedPanelBg }}>
                 {fMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>✍️</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Dicta hallazgos</div><div style={S.phD}>Escribe aquí lo que ves para redactar el informe.</div></div>}
                 {fMsgs.map((m, i) => m.role === "user" ? <div key={i} style={{ ...S.ub, background: P.chatBubbleUser }}>{m.content}</div> : <div key={i} style={{ ...S.ab, background: P.chatBubbleAsst, borderColor: P.chatBubbleAsstBorder, color: P.chatBubbleText }}>✅ Informe {i === fMsgs.length - 1 ? "generado" : "actualizado"}</div>)}
                 {ldReport && <div style={S.ab}><LoadingDots text="Redactando informe..." /></div>}
                 <div ref={fEndRef} />
               </div>
               {err && <div style={S.er}>{err}</div>}
-              <div style={{ ...S.ia, background: P.chatInputAreaBg }}><div style={S.ir}>
+              <div style={{ ...S.ia, background: linkedPanelBg }}><div style={S.ir}>
                 <textarea ref={fInpRef} value={fInput} onChange={e => setFInput(e.target.value)} onKeyDown={e => hk(e, sendFindings)} onFocus={() => setFf("fi")} onBlur={() => setFf("")} placeholder='Hallazgos, "completa", "plagia"...' style={{ ...S.ta(ff === "fi"), borderColor: ff === "fi" ? P.chatInputBorderFocus : P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor }} rows={2} disabled={ldReport} />
                 <button onClick={sendFindings} disabled={ldReport || !fInput.trim()} style={{ ...S.sb(ldReport || !fInput.trim()), background: ldReport || !fInput.trim() ? (isDark ? "#333" : "#ccc") : P.chatSendBg }}>▶</button>
               </div></div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-              <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Chat de análisis</span></div>
-              <div style={{ ...S.ca, background: P.chatPanelBg }}>
+              <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Chat de análisis</span></div>
+              <div style={{ ...S.ca, background: linkedPanelBg }}>
                 {cMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>💬</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Consulta lo que necesites</div><div style={S.phD}>Debate sobre el caso con el informe y el análisis.</div></div>}
                 {cMsgs.map((m, i) => m.role === "user" ? <div key={i} style={{ ...S.ub, background: P.chatBubbleUser }}>{m.content}</div> : <div key={i} style={{ ...S.ab, background: P.chatBubbleAsst, borderColor: P.chatBubbleAsstBorder, color: P.chatBubbleText }}><div dangerouslySetInnerHTML={{ __html: m.content }} /></div>)}
                 {ldChat && <div style={S.ab}><LoadingDots text="Pensando..." /></div>}
                 <div ref={cEndRef} />
               </div>
-              <div style={{ ...S.ia, background: P.chatInputAreaBg }}><div style={S.ir}>
+              <div style={{ ...S.ia, background: linkedPanelBg }}><div style={S.ir}>
                 <textarea ref={cInpRef} value={cInput} onChange={e => setCInput(e.target.value)} onKeyDown={e => hk(e, sendChat)} onFocus={() => setFf("ch")} onBlur={() => setFf("")} placeholder="¿Recomendar PET-TC? ¿Seguimiento?..." style={{ ...S.ta(ff === "ch"), borderColor: ff === "ch" ? P.chatInputBorderFocus : P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor }} rows={2} disabled={ldChat} />
                 <button onClick={sendChat} disabled={ldChat || !cInput.trim()} style={{ ...S.sb(ldChat || !cInput.trim()), background: ldChat || !cInput.trim() ? (isDark ? "#333" : "#ccc") : P.chatSendBg }}>▶</button>
               </div></div>
@@ -2458,15 +2461,15 @@ ${instruction}`;
         </div>
 
         <div style={{ ...S.rp, boxShadow: `inset 0 2px 0 ${activeTabMeta.color}`, background: tabSurfaceBg }}>
-          <div style={{ padding: isMobile ? "8px 12px" : "9px 14px", borderBottom: "1px solid " + tabSurfaceBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: hexToRgba(tabAccent, isDark ? 0.1 : 0.05) }}>
+          <div style={{ padding: isMobile ? "8px 12px" : "9px 14px", borderBottom: "1px solid " + tabSurfaceBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: linkedHeaderBg }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeTabMeta.color, boxShadow: `0 0 0 2px ${P.bg}` }} />
-            Panel vinculado a: <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
+            <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
           </div>
 
           {rTab === "petition" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rc, background: P.chatPanelBg, fontSize: 13, lineHeight: 1.5 }}>
+            <div style={{ ...S.rc, background: linkedPanelBg, fontSize: 13, lineHeight: 1.5 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <div style={{ padding: "14px 16px", background: P.inputBgFocus, border: "1px solid " + P.chatInputBorderFocus, borderRadius: 10 }}>
+                    <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
                       <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button
@@ -2665,9 +2668,9 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
           </div>}
 
           {rTab === "analysis" && <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? "14px 12px" : "16px 18px" }}>
-            <div style={{ border: "1px solid " + P.analysisHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: isAnalysisEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
-              <div style={{ ...S.rh, background: P.analysisHeader, borderColor: P.analysisHeaderBorder }}><span style={{ ...S.rt, color: P.analysisTitleColor }}>Análisis del caso</span></div>
-              <div style={{ ...S.rc, background: P.analysisBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isAnalysisEmpty ? "0 0 auto" : 1, padding: isAnalysisEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
+            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isAnalysisEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Análisis del caso</span></div>
+              <div style={{ ...S.rc, background: linkedCardBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isAnalysisEmpty ? "0 0 auto" : 1, padding: isAnalysisEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
                 <div style={{ flex: 1 }}>
                   {ldAnalysis ? <div style={S.ph}><LoadingDots text="Analizando..." /></div> : analysis ? <div dangerouslySetInnerHTML={{ __html: analysis }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78 }}>Pulsa 🤖 para generar el análisis.</div>}
                 </div>
@@ -2682,9 +2685,9 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
               </div>
             </div>
 
-            <div style={{ border: "1px solid " + P.keyIdeasHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: isKeyIdeasEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
-              <div style={{ ...S.rh, background: P.keyIdeasHeader, borderColor: P.keyIdeasHeaderBorder }}><span style={{ ...S.rt, color: P.keyIdeasTitleColor }}>Ideas Clave</span></div>
-              <div style={{ ...S.rc, background: P.keyIdeasBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isKeyIdeasEmpty ? "0 0 auto" : 1, padding: isKeyIdeasEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
+            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isKeyIdeasEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Ideas Clave</span></div>
+              <div style={{ ...S.rc, background: linkedCardBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isKeyIdeasEmpty ? "0 0 auto" : 1, padding: isKeyIdeasEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
                 <div style={{ flex: 1 }}>
                   {ldKeyIdeas ? <div style={S.ph}><LoadingDots text="Extrayendo ideas clave..." /></div> : keyIdeas ? <div dangerouslySetInnerHTML={{ __html: keyIdeas }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78 }}>Pulsa 🤖 para generar ideas clave.</div>}
                 </div>
@@ -2700,9 +2703,9 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
             </div>
 
 
-            <div style={{ border: "1px solid " + P.diffDiagHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: isDiffDiagEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
-              <div style={{ ...S.rh, background: P.diffDiagHeader, borderColor: P.diffDiagHeaderBorder }}><span style={{ ...S.rt, color: P.diffDiagTitleColor }}>Diagnóstico Diferencial</span></div>
-              <div style={{ ...S.rc, background: P.diffDiagBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isDiffDiagEmpty ? "0 0 auto" : 1, padding: isDiffDiagEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
+            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isDiffDiagEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Diagnóstico Diferencial</span></div>
+              <div style={{ ...S.rc, background: linkedCardBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isDiffDiagEmpty ? "0 0 auto" : 1, padding: isDiffDiagEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
                 <div style={{ flex: 1 }}>
                   {ldDiffDiag ? <div style={S.ph}><LoadingDots text="Generando diferencial..." /></div> : diffDiag ? <div dangerouslySetInnerHTML={{ __html: diffDiag }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78 }}>Pulsa 🤖 para generar diferencial.</div>}
                 </div>
