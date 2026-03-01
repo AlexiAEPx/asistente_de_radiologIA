@@ -1153,6 +1153,8 @@ export default function Page() {
   const [reportSelectionText, setReportSelectionText] = useState("");
   const [ldReportSelectionAction, setLdReportSelectionAction] = useState(false);
   const activeTabMeta = TAB_UI_META[rTab] || TAB_UI_META.petition;
+  const activeTabSurface = `color-mix(in srgb, ${activeTabMeta.color} 12%, transparent)`;
+  const activeTabSoftBorder = `color-mix(in srgb, ${activeTabMeta.color} 38%, ${P.goldBorder})`;
   useEffect(() => {
     setClinicalContextDraft(clinicalContextData.structuredText || "");
     setClinicalRecommendations("");
@@ -2128,6 +2130,18 @@ ${instruction}`;
   const isDiffDiagEmpty = !ldDiffDiag && !diffDiag;
   const isMindMapEmpty = !ldMindMap && !mindMap;
   const hasClinicalInput = !!(clinicalContextDraft.trim() || clinicalContextData.hasAny);
+  const clinicalContextPreview = useMemo(() => {
+    const base = (clinicalContextDraft.trim() || clinicalContextData.structuredText || "").trim();
+    if (!base) {
+      return "CONTEXTO CLÍNICO:\n- Motivo de la petición\n- Antecedentes relevantes\n- Dato clínico clave";
+    }
+    if (/^CONTEXTO CLÍNICO:/i.test(base)) return base;
+    const keyLines = splitFreeTextIntoItems(base)
+      .map(line => line.replace(/^[\-•*]\s*/, "").trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    return ["CONTEXTO CLÍNICO:", ...keyLines.map(line => `- ${line}`)].join("\n");
+  }, [clinicalContextDraft, clinicalContextData.structuredText]);
   const showReportEditor = isEditingReport || !report;
   const reportEditorHtml = editedReport || report || REPORT_TEMPLATE_HTML;
 
@@ -2145,16 +2159,16 @@ ${instruction}`;
     clr: { padding: isMobile ? "4px 8px" : "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: P.gold, fontSize: isMobile ? 11 : 12, cursor: "pointer", fontWeight: 600, fontFamily: "inherit" },
     main: { display: "flex", flexDirection: isMobile ? "column" : "row", flex: 1, overflow: isMobile ? "visible" : "hidden" },
     lp: isMobile
-      ? { display: mobilePanel === "left" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)" }
-      : { display: lpCollapsed ? "none" : "flex", flexDirection: "column", width: lpWidth + "%", minWidth: 200, flexShrink: 0, transition: "width 0.2s" },
+      ? { display: mobilePanel === "left" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)", background: activeTabSurface, borderRight: "1px solid " + activeTabSoftBorder }
+      : { display: lpCollapsed ? "none" : "flex", flexDirection: "column", width: lpWidth + "%", minWidth: 200, flexShrink: 0, transition: "width 0.2s", background: activeTabSurface, borderRight: "1px solid " + activeTabSoftBorder },
     divider: isMobile
       ? { display: "none" }
       : { width: 6, cursor: lpCollapsed ? "default" : "col-resize", background: "transparent", flexShrink: 0, position: "relative", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" },
     dividerLine: { width: lpCollapsed ? 0 : 2, height: "100%", background: P.goldBorder, borderRadius: 1, transition: "background 0.2s, width 0.2s" },
     collapseBtn: { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 20, height: 40, borderRadius: 4, border: "1px solid " + P.goldBorder, background: P.bg2, color: P.gold, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontFamily: "inherit", zIndex: 11, transition: "background 0.2s" },
     rp: isMobile
-      ? { display: mobilePanel === "right" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)" }
-      : { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 },
+      ? { display: mobilePanel === "right" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)", background: activeTabSurface }
+      : { display: "flex", flexDirection: "column", flex: 1, minWidth: 0, background: activeTabSurface },
     tb: { display: "flex", borderBottom: "1px solid " + P.tabShellBorder, background: P.tabShellBg, flexShrink: 0, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth", gap: 6, padding: isMobile ? "6px 6px 5px" : "8px 8px 7px", backdropFilter: "blur(10px)" },
     cs: { flex: 1, overflowY: "auto", padding: isMobile ? "12px 10px" : "14px 16px" },
     fg: { marginBottom: 14 },
@@ -2345,9 +2359,23 @@ ${instruction}`;
 
       <div ref={mainRef} style={S.main}>
         <div style={S.lp}>
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid " + P.goldBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: P.bg2 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeTabMeta.color, boxShadow: `0 0 0 2px ${P.bg}` }} />
-            Chat vinculado a: <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
+          <div style={{ ...S.tb, borderBottom: "1px solid " + activeTabSoftBorder, background: `linear-gradient(135deg, ${activeTabSurface}, ${P.tabShellBg})`, borderTop: `2px solid ${activeTabMeta.color}` }}>
+            {rightTabsConfig.map(t => (
+              <Tab
+                key={t.key}
+                active={rTab === t.key}
+                icon={t.icon}
+                label={t.label}
+                status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
+                stale={!!staleTabs[t.key]}
+                onClick={() => openRightTab(t.key)}
+                onRun={t.run}
+                canRun={t.canRun}
+                isRunning={t.loading}
+                P={P}
+                compact={isMobile}
+              />
+            ))}
           </div>
           {rTab === "petition" ? (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -2415,36 +2443,12 @@ ${instruction}`;
         </div>
 
         <div style={{ ...S.rp, boxShadow: `inset 0 2px 0 ${activeTabMeta.color}` }}>
-          <div
-            data-tabbar=""
-            style={{
-              ...S.tb,
-              borderBottom: "none",
-            }}
-          >
-            {rightTabsConfig.map(t => (
-              <Tab
-                key={t.key}
-                active={rTab === t.key}
-                icon={t.icon}
-                label={t.label}
-                status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
-                stale={!!staleTabs[t.key]}
-                onClick={() => openRightTab(t.key)}
-                onRun={t.run}
-                canRun={t.canRun}
-                isRunning={t.loading}
-                P={P}
-                compact={isMobile}
-              />
-            ))}
-          </div>
-
           {rTab === "petition" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={{ ...S.rc, background: P.chatPanelBg, fontSize: 13, lineHeight: 1.5 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ padding: "14px 16px", background: P.inputBgFocus, border: "1px solid " + P.chatInputBorderFocus, borderRadius: 10 }}>
-                      <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                      <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.chatTitleColor }}>Contexto clínico</div>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button
                             onClick={() => syncClinicalContextIntoReport({ openReportTab: true })}
@@ -2470,10 +2474,16 @@ ${instruction}`;
                           </button>
                         </div>
                       </div>
+                      <div style={{ whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.45, color: P.text2, border: "1px dashed " + P.chatInputBorder, borderRadius: 8, background: P.chatInputBg, padding: "9px 10px", marginBottom: 8 }}>
+                        {clinicalContextPreview}
+                      </div>
                       <textarea
                         value={clinicalContextDraft}
                         onChange={(e) => setClinicalContextDraft(e.target.value)}
-                        placeholder="Escribe o pega aquí el contexto clínico..."
+                        placeholder={"CONTEXTO CLÍNICO:
+- Motivo
+- Antecedentes
+- Hallazgo clave"}
                         style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
                       />
                     </div>
