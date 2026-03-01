@@ -206,10 +206,24 @@ const formatChatAssistantResponse = (raw = "") => {
           .map((l) => `<li style="margin:0 0 0.35em 0;">${l.replace(/^[-•*]\s+/, "")}</li>`)
           .join("")}</ul>`;
       }
-      return `<p style="margin:0;">${lines.join("<br>")}</p>`;
+
+      if (lines.length === 1) {
+        const line = lines[0];
+        if (/^###\s+/.test(line)) {
+          return `<h4 style="margin:0;font-size:0.96rem;line-height:1.4;font-weight:800;color:#14532d;">${line.replace(/^###\s+/, "")}</h4>`;
+        }
+        if (/^##\s+/.test(line)) {
+          return `<h3 style="margin:0;font-size:1.02rem;line-height:1.4;font-weight:800;color:#14532d;">${line.replace(/^##\s+/, "")}</h3>`;
+        }
+        if (/^#\s+/.test(line)) {
+          return `<h2 style="margin:0;font-size:1.08rem;line-height:1.35;font-weight:800;color:#14532d;">${line.replace(/^#\s+/, "")}</h2>`;
+        }
+      }
+
+      return `<p style="margin:0;font-size:0.86rem;">${lines.join("<br>")}</p>`;
     });
 
-  return `<div style="font-size:15px;line-height:1.75;font-weight:500;">${blocks.join('<div style="height:0.6em"></div>')}</div>`;
+  return `<div style="font-size:13px;line-height:1.68;font-weight:500;">${blocks.join('<div style="height:0.5em"></div>')}</div>`;
 };
 
 const normalizeCopiedReportText = (raw = "") => String(raw)
@@ -2212,8 +2226,8 @@ ${instruction}`;
       color: active ? (isUrgentType ? "#ef4444" : P.gold) : P.text3,
       borderColor: active ? (isUrgentType ? "#ef4444" : P.gold) : P.goldBorder }; },
     ca: { flex: 1, overflowY: "auto", padding: "14px", display: "flex", flexDirection: "column", gap: 9 },
-    ub: { alignSelf: "flex-end", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 3px 13px", fontSize: 14, lineHeight: 1.5, background: P.bubbleUser, color: "#fff" },
-    ab: { alignSelf: "flex-start", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 13px 3px", fontSize: 13, lineHeight: 1.5, background: P.bubbleAsst, color: P.text2, border: "1px solid " + P.bubbleAsstBorder },
+    ub: { alignSelf: "flex-end", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 3px 13px", fontSize: 13, lineHeight: 1.45, background: P.bubbleUser, color: "#fff" },
+    ab: { alignSelf: "flex-start", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 13px 3px", fontSize: 12.5, lineHeight: 1.45, background: P.bubbleAsst, color: P.text2, border: "1px solid " + P.bubbleAsstBorder },
     ia: { padding: "9px 12px", borderTop: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0 },
     ir: { display: "flex", gap: 7, alignItems: "flex-end" },
     ta: (f) => ({ flex: 1, resize: "none", border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), borderRadius: 10, padding: "9px 12px", fontSize: 14, lineHeight: 1.5, background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", minHeight: f ? 140 : 42, maxHeight: 300, overflow: "auto", boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s" }),
