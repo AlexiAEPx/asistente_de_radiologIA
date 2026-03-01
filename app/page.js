@@ -241,9 +241,9 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const inferGender = () => {
     const g = (c.gender || "").trim().toLowerCase();
     if (["mujer", "femenino", "femenina"].includes(g)) return "mujer";
-    if (["hombre", "masculino", "masculina", "varón", "varon"].includes(g)) return "hombre";
+    if (["hombre", "masculino", "masculina", "varón", "varon", "barón", "baron"].includes(g)) return "hombre";
     const origin = textoOrigen.toLowerCase();
-    if (origin.includes("varón") || origin.includes("varon") || origin.includes("hombre") || origin.includes("masculino")) return "hombre";
+    if (origin.includes("varón") || origin.includes("varon") || origin.includes("barón") || origin.includes("baron") || origin.includes("hombre") || origin.includes("masculino")) return "hombre";
     if (origin.includes("mujer") || origin.includes("femenina") || origin.includes("femenino")) return "mujer";
     return "";
   };
@@ -260,6 +260,22 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
     .replace(/^(justificaci[oó]n cl[ií]nica|motivo de petici[oó]n|sospecha diagn[oó]stica)\s*:\s*/i, "")
     .replace(/\s+/g, " ")
     .trim();
+  const stripDemographicPrefix = (text) => String(text || "")
+    .replace(
+      /^(?:var[oó]n|bar[oó]n|hombre|mujer|masculin[ao]|femenin[ao])\s*,?\s*(?:de\s*)?\d{1,3}\s*a(?:n|ñ)os\s*,?\s*/i,
+      ""
+    )
+    .trim();
+  const semanticKey = (text) => String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(varon|baron|hombre|mujer|masculin[ao]|femenin[ao])\b/g, " ")
+    .replace(/\b(?:de\s*)?\d{1,3}\s*anos\b/g, " ")
+    .replace(/^(?:sospecha(?:\s+de)?|dx)\s*/i, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   const extractReasonSignals = (text) => {
     const source = (text || "").trim();
@@ -270,7 +286,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
 
     const detectedGender = /\b(mujer|femenin[ao])\b/i.test(normalized)
       ? "mujer"
-      : /\b(hombre|var[oó]n|masculin[ao])\b/i.test(normalized)
+      : /\b(hombre|[vb]ar[oó]n|masculin[ao])\b/i.test(normalized)
         ? "hombre"
         : "";
     const ageMatch = normalized.match(/\b(\d{1,3})\s*a(?:n|ñ)os\b/i);
@@ -299,7 +315,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
     const detectedPriority = priorityMap.find(({ rx }) => rx.test(low))?.label || "";
 
     let findingsChunk = normalized;
-    findingsChunk = findingsChunk.replace(/\b(mujer|femenin[ao]|hombre|var[oó]n|masculin[ao])\b/gi, " ");
+    findingsChunk = findingsChunk.replace(/\b(mujer|femenin[ao]|hombre|[vb]ar[oó]n|masculin[ao])\b/gi, " ");
     findingsChunk = findingsChunk.replace(/\b\d{1,3}\s*a(?:n|ñ)os\b/gi, " ");
     findingsChunk = findingsChunk.replace(/\b(?:tc|tac|rm|rx|pet|angio\s?tc|ecograf(?:i|í)a)\b[^,;:.\n]*/gi, " ");
     findingsChunk = findingsChunk.replace(/\bc[óo]digo\s+(ictus|trauma|tep|m[ée]dula|hemostasis)\b/gi, " ");
@@ -332,7 +348,11 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   };
 
   const reasonLines = motivo
-    ? motivo.split(/\n+/).map(sanitizeReason).filter(Boolean)
+    ? motivo
+      .split(/\n+/)
+      .map(sanitizeReason)
+      .map(stripDemographicPrefix)
+      .filter(Boolean)
     : [];
   const reasonSignals = extractReasonSignals(motivo);
 
@@ -364,7 +384,7 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   candidates.forEach((item) => {
     const cleanItem = toBullet(item || "");
     if (!cleanItem) return;
-    const key = cleanItem.toLowerCase();
+    const key = semanticKey(cleanItem) || cleanItem.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
     bullets.push(`${cleanItem}.`);
@@ -378,6 +398,25 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
     structuredText: ["CONTEXTO CLÍNICO:", ...bullets.map(line => `- ${line}`)].join("\n"),
   };
 };
+
+const REPORT_TEMPLATE_HTML = `
+  <div data-report-template="true" style="font-size:15px;line-height:1.65;">
+    <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Contexto Clínico</h3>
+    <p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Pendiente de confirmar desde la pestaña Petición]</p>
+
+    <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Técnicas Realizadas</h3>
+    <p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Pendiente]</p>
+
+    <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Hallazgos</h3>
+    <p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Pendiente]</p>
+
+    <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Conclusión</h3>
+    <p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Pendiente]</p>
+
+    <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Recomendación</h3>
+    <p style="margin:0;color:#6b7280;font-style:italic;">[Pendiente]</p>
+  </div>
+`;
 
 const CLINICAL_CONTEXT_POLISH_SYS = `Eres un redactor clínico-radiológico experto.
 
@@ -1096,7 +1135,6 @@ export default function Page() {
   const [closeAfterExport, setCloseAfterExport] = useState(false);
   const [tabStatus, setTabStatus] = useState({ petition: "idle", report: "idle", analysis: "idle" });
   const [tabSignatures, setTabSignatures] = useState({ analysis: "", keyIdeas: "", justification: "", diffDiag: "", mindMap: "" });
-  const rightTabbarRef = useRef(null);
 
   const clinicalContextData = useMemo(() => buildClinicalContextData(ctx, fMsgs, pMsgs), [ctx, fMsgs, pMsgs]);
   const tabInputsSignature = useMemo(() => buildTabSignatures({ clinicalContextData, report, analysis, ctx, fMsgs, cMsgs }), [clinicalContextData, report, analysis, ctx, fMsgs, cMsgs]);
@@ -1496,6 +1534,10 @@ export default function Page() {
     if (!isEditingReport) setEditedReport(report);
   }, [report, isEditingReport]);
 
+  useEffect(() => {
+    if (!report && !editedReport) setEditedReport(REPORT_TEMPLATE_HTML);
+  }, [report, editedReport]);
+
   useEffect(() => { pEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [pMsgs, ldPetitionChat]);
   useEffect(() => { fEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [fMsgs, ldReport]);
   useEffect(() => { cEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [cMsgs, ldChat]);
@@ -1595,11 +1637,17 @@ export default function Page() {
   };
 
   const clean = (s) => { let t = s.trim(); if (t.startsWith("```html")) t = t.slice(7); else if (t.startsWith("```")) t = t.slice(3); if (t.endsWith("```")) t = t.slice(0, -3); return t.trim(); };
+  const normalizeDictation = (input = "") => String(input).replace(/\bbar([oó])n(es)?\b/gi, (match, vowel, plural) => {
+    const replacement = `var${(vowel || "o").toLowerCase()}n${plural || ""}`;
+    return match[0] === match[0].toUpperCase()
+      ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
+      : replacement;
+  });
 
 
 
   const sendPetitionChat = async () => {
-    const t = pInput.trim(); if (!t || ldPetitionChat) return;
+    const t = normalizeDictation(pInput).trim(); if (!t || ldPetitionChat) return;
     setErr("");
     const um = { role: "user", content: t };
     setPMsgs(prev => [...prev, um]);
@@ -1612,7 +1660,7 @@ export default function Page() {
   };
 
   const sendFindings = async () => {
-    const t = fInput.trim(); if (!t || ldReport) return;
+    const t = normalizeDictation(fInput).trim(); if (!t || ldReport) return;
     setErr(""); const um = { role: "user", content: t }; const nm = [...fMsgs, um];
     setFMsgs(nm); setFInput(""); setLdReport(true); setRTab("report");
     if (isMobile) setMobilePanel("right");
@@ -1835,11 +1883,38 @@ ${instruction}`;
     }
     setLdClinicalRecommendations(false);
   };
+  const confirmContextAndStartReport = async () => {
+    const seed = (clinicalContextDraft.trim() || clinicalContextData.structuredText || "").trim();
+    if (!seed || ldReport || report || fMsgs.length > 0) return;
+    setErr("");
+    setLdReport(true);
+    setRTab("report");
+    if (isMobile) setMobilePanel("right");
+    const seedMessage = { role: "user", content: `Contexto clínico confirmado:\n${seed}` };
+    const messages = [seedMessage];
+    setFMsgs(messages);
+    try {
+      const h = clean(await callAPI(REPORT_SYS(ctx, isDark, seed), messages));
+      setFMsgs(prev => [...prev, { role: "assistant", content: h }]);
+      setReport(h);
+      setCtxSnap(JSON.stringify(ctx));
+      saveToHistory(h, ctx);
+    } catch (e) {
+      setErr("Error informe: " + e.message);
+    }
+    setLdReport(false);
+  };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
   const syncEditedReportFromEditor = () => {
     const html = reportEditorRef.current?.innerHTML ?? "";
     setEditedReport(html);
     return html;
+  };
+  const applyReportFormat = (command, value = null) => {
+    if (!reportEditorRef.current) return;
+    reportEditorRef.current.focus();
+    document.execCommand(command, false, value);
+    syncEditedReportFromEditor();
   };
   const handleReportEditorPaste = (e) => {
     e.preventDefault();
@@ -1849,7 +1924,7 @@ ${instruction}`;
     document.execCommand("insertHTML", false, safeHtml);
   };
   const startEditReport = () => {
-    setEditedReport(report);
+    setEditedReport(report || editedReport || REPORT_TEMPLATE_HTML);
     setIsEditingReport(true);
   };
   const cancelEditReport = () => {
@@ -1980,16 +2055,19 @@ ${instruction}`;
     mindMap: !!mindMap && !!tabSignatures.mindMap && tabSignatures.mindMap !== tabInputsSignature.mindMap,
   }), [analysis, keyIdeas, justification, diffDiag, mindMap, tabSignatures, tabInputsSignature]);
 
-  const scrollRightTabs = (delta) => {
-    if (!rightTabbarRef.current) return;
-    rightTabbarRef.current.scrollBy({ left: delta, behavior: "smooth" });
-  };
-
   const rightTabsConfig = [
     { key: "petition", icon: "🩺", label: "Petición", run: null, loading: false, canRun: false },
     { key: "report", icon: "📄", label: "Informe", run: null, loading: ldReport, canRun: false },
     { key: "analysis", icon: "🔍", label: "Análisis", run: null, loading: false, canRun: false },
   ];
+  const isJustificationEmpty = !ldJustification && !justification;
+  const isAnalysisEmpty = !ldAnalysis && !analysis;
+  const isKeyIdeasEmpty = !ldKeyIdeas && !keyIdeas;
+  const isDiffDiagEmpty = !ldDiffDiag && !diffDiag;
+  const isMindMapEmpty = !ldMindMap && !mindMap;
+  const hasClinicalInput = !!(clinicalContextDraft.trim() || clinicalContextData.hasAny);
+  const showReportEditor = isEditingReport || !report;
+  const reportEditorHtml = editedReport || report || REPORT_TEMPLATE_HTML;
 
   const selectedModel = getModelByKey(model);
   const sm = selectedModel;
@@ -2016,7 +2094,6 @@ ${instruction}`;
       ? { display: mobilePanel === "right" ? "flex" : "none", flexDirection: "column", width: "100%", minHeight: "calc(100vh - 110px)" }
       : { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 },
     tb: { display: "flex", borderBottom: "1px solid " + P.tabShellBorder, background: P.tabShellBg, flexShrink: 0, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth", gap: 6, padding: isMobile ? "6px 6px 5px" : "8px 8px 7px", backdropFilter: "blur(10px)" },
-    tabNavBtn: { width: 30, border: "1px solid " + P.tabShellBorder, borderRadius: 8, margin: isMobile ? "6px 2px 5px" : "8px 3px 7px", background: P.tabBtnBg, color: P.gold, cursor: "pointer", fontSize: 14, flexShrink: 0 },
     cs: { flex: 1, overflowY: "auto", padding: isMobile ? "12px 10px" : "14px 16px" },
     fg: { marginBottom: 14 },
     lb: { display: "block", fontSize: 11, fontWeight: 600, color: P.text3, marginBottom: 4, letterSpacing: 0.3, textTransform: "uppercase" },
@@ -2040,6 +2117,7 @@ ${instruction}`;
     rt: { fontSize: isMobile ? 12 : 13, fontWeight: 600, color: P.reportTitleColor, letterSpacing: 0.5, textTransform: "uppercase" },
     rc: { flex: 1, overflowY: "auto", padding: isMobile ? "14px 12px" : "20px 24px", background: P.reportBg, color: P.text },
     cb: (v, a) => ({ padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: a ? "#22c55e" : v === "p" ? P.gold : P.goldBg, color: a ? "#fff" : v === "p" ? "#fff" : P.gold }),
+    aiMiniBtn: (disabled, bg) => ({ width: 32, height: 32, minWidth: 32, borderRadius: 8, border: "none", cursor: disabled ? "not-allowed" : "pointer", fontSize: 16, fontWeight: 700, fontFamily: "inherit", background: bg, color: "#fff", opacity: disabled ? 0.55 : 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }),
     lg: { display: "flex", gap: 10, flexWrap: "wrap", padding: "7px 14px", borderTop: "1px solid " + P.legendBorder, background: P.legendBg, flexShrink: 0 },
     ld: (c) => ({ width: 7, height: 7, borderRadius: "50%", background: c }),
     li: { display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: P.text3 },
@@ -2064,7 +2142,7 @@ ${instruction}`;
         .rpt-content pre { max-width: 100% !important; overflow-x: auto !important; }
       `}</style>}
       <div style={S.hdr}>
-        <div><div style={S.logo}>asistente_de_radiolog<span style={{ color: isDark ? "#e8c547" : "#b8860b", textShadow: isDark ? "0 0 8px rgba(232,197,71,0.4)" : "none" }}>IA</span></div><div style={S.sub}>Estación de trabajo <span style={{ letterSpacing: 1, opacity: 0.7 }}>·</span> <span style={{ fontStyle: "italic", letterSpacing: 1, fontSize: 9, opacity: 0.6 }}>by Alexis Espinosa</span></div></div>
+        <div><div style={S.logo}>asistente_de_radiolog<span style={{ color: isDark ? "#e8c547" : "#b8860b", textShadow: isDark ? "0 0 8px rgba(232,197,71,0.4)" : "none" }}>IA</span> <span aria-hidden="true" style={{ fontSize: isMobile ? 15 : 18 }}>🤖</span></div><div style={S.sub}>Estación de trabajo <span style={{ letterSpacing: 1, opacity: 0.7 }}>·</span> <span style={{ fontStyle: "italic", letterSpacing: 1, fontSize: 9, opacity: 0.6 }}>by Alexis Espinosa</span></div></div>
         <div style={S.hdrR}>
           {spending.calls > 0 && <div style={{
             display: isMobile ? "none" : "flex", alignItems: "center", gap: 8, padding: "4px 12px",
@@ -2271,96 +2349,108 @@ ${instruction}`;
         </div>
 
         <div style={S.rp}>
-          <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
-            <button onClick={() => scrollRightTabs(-220)} style={S.tabNavBtn} title="Ver pestañas anteriores">◀</button>
-            <div
-              data-tabbar=""
-              ref={rightTabbarRef}
-              style={{
-                ...S.tb,
-                borderBottom: "none",
-                flex: 1,
-                overflowX: "hidden",
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-              }}
-            >
-              {rightTabsConfig.map(t => (
-                <Tab
-                  key={t.key}
-                  active={rTab === t.key}
-                  icon={t.icon}
-                  label={t.label}
-                  status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
-                  stale={!!staleTabs[t.key]}
-                  onClick={() => openRightTab(t.key)}
-                  onRun={t.run}
-                  canRun={t.canRun}
-                  isRunning={t.loading}
-                  P={P}
-                  compact={isMobile}
-                />
-              ))}
-            </div>
-            <button onClick={() => scrollRightTabs(220)} style={S.tabNavBtn} title="Ver pestañas siguientes">▶</button>
+          <div
+            data-tabbar=""
+            style={{
+              ...S.tb,
+              borderBottom: "none",
+            }}
+          >
+            {rightTabsConfig.map(t => (
+              <Tab
+                key={t.key}
+                active={rTab === t.key}
+                icon={t.icon}
+                label={t.label}
+                status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
+                stale={!!staleTabs[t.key]}
+                onClick={() => openRightTab(t.key)}
+                onRun={t.run}
+                canRun={t.canRun}
+                isRunning={t.loading}
+                P={P}
+                compact={isMobile}
+              />
+            ))}
           </div>
 
           {rTab === "petition" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}>
-              <span style={{ ...S.rt, color: P.chatTitleColor }}>Contexto clínico</span>
-              {!!clinicalContextData.hasAny && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  onClick={genClinicalRecommendations}
-                  disabled={ldClinicalRecommendations || !(clinicalContextDraft.trim() || clinicalContextData.structuredText)}
-                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: ldClinicalRecommendations ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff" }}
-                >
-                  {ldClinicalRecommendations ? "🤖 ⏳ Recomendando..." : "🤖 🧭 Recomendaciones"}
-                </button>
-                <button
-                  onClick={polishClinicalContext}
-                  disabled={ldClinicalPolish || !clinicalContextDraft.trim()}
-                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: ldClinicalPolish ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: ldClinicalPolish ? (isDark ? "#333" : "#ccc") : "linear-gradient(135deg,#6366f1,#4338ca)", color: "#fff" }}
-                >
-                  {ldClinicalPolish ? "🤖 ⏳ Procesando..." : "🤖 ✨ Corregir con IA"}
-                </button>
-                <button
-                  onClick={cpClinicalContext}
-                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: copied === "clinical" ? "#22c55e" : P.chatSendBg, color: "#fff" }}
-                >
-                  {copied === "clinical" ? "✓ Copiado" : "📋 Copiar y pegar"}
-                </button>
-              </div>}
-            </div>
             <div style={{ ...S.rc, background: P.chatPanelBg, fontSize: 13, lineHeight: 1.5 }}>
-              {clinicalContextData.hasAny
-                ? <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ padding: "14px 16px", background: P.inputBgFocus, border: "1px solid " + P.chatInputBorderFocus, borderRadius: 10 }}>
-                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.chatTitleColor }}>Contexto clínico (editable)</div>
+                      <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={confirmContextAndStartReport}
+                            disabled={ldReport || !clinicalContextDraft.trim() || !!report || fMsgs.length > 0}
+                            title="Confirmar este contexto y empezar el informe automáticamente"
+                            style={{ padding: "6px 10px", borderRadius: 8, border: "none", cursor: ldReport || !clinicalContextDraft.trim() || !!report || fMsgs.length > 0 ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", opacity: ldReport || !clinicalContextDraft.trim() || !!report || fMsgs.length > 0 ? 0.55 : 1 }}
+                          >
+                            {ldReport ? "⏳" : "✅"}
+                          </button>
+                          <button
+                            onClick={polishClinicalContext}
+                            disabled={ldClinicalPolish || !clinicalContextDraft.trim()}
+                            title="Invocar IA para corregir este cajón"
+                            style={S.aiMiniBtn(ldClinicalPolish || !clinicalContextDraft.trim(), ldClinicalPolish ? (isDark ? "#333" : "#ccc") : "linear-gradient(135deg,#6366f1,#4338ca)")}
+                          >
+                            {ldClinicalPolish ? "⏳" : "🤖"}
+                          </button>
+                          <button
+                            onClick={cpClinicalContext}
+                            style={{ padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: copied === "clinical" ? "#22c55e" : P.chatSendBg, color: "#fff" }}
+                          >
+                            {copied === "clinical" ? "✓ Copiado" : "📋 Copiar"}
+                          </button>
+                        </div>
+                      </div>
                       <textarea
                         value={clinicalContextDraft}
                         onChange={(e) => setClinicalContextDraft(e.target.value)}
+                        placeholder="Escribe o pega aquí el contexto clínico..."
                         style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
                       />
                     </div>
                     <div style={{ padding: "14px 16px", background: P.recoPanelBg, border: "1px solid " + P.recoPanelBorder, borderRadius: 10 }}>
-                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>🤖 Recomendaciones para este caso</div>
-                      <div style={{ whiteSpace: "pre-wrap", color: P.text }}>{clinicalRecommendations || "Genera recomendaciones para ver un listado breve de hallazgos clave a buscar según este contexto clínico."}</div>
+                      <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>Recomendaciones para este caso</div>
+                        <button
+                          onClick={genClinicalRecommendations}
+                          disabled={ldClinicalRecommendations || !(clinicalContextDraft.trim() || clinicalContextData.structuredText)}
+                          title="Invocar IA para rellenar este cajón"
+                          style={S.aiMiniBtn(ldClinicalRecommendations || !(clinicalContextDraft.trim() || clinicalContextData.structuredText), "linear-gradient(135deg,#a855f7,#7c3aed)")}
+                        >
+                          {ldClinicalRecommendations ? "⏳" : "🤖"}
+                        </button>
+                      </div>
+                      <div style={{ whiteSpace: "pre-wrap", color: P.text }}>
+                        {clinicalRecommendations
+                          ? clinicalRecommendations
+                          : <span style={{ color: P.text3, opacity: 0.78, textShadow: "0 1px 0 rgba(0,0,0,0.08)" }}>Pulsa 🤖 para ver un listado breve de hallazgos clave a buscar según este contexto clínico.</span>}
+                      </div>
                     </div>
-                    <div style={{ border: "1px solid " + P.justifHeaderBorder, borderRadius: 10, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
-                      <div style={{ ...S.rh, background: P.justifHeader, borderColor: P.justifHeaderBorder }}><span style={{ ...S.rt, color: P.justifTitleColor }}>¿Justificada?</span><button onClick={genJustification} disabled={ldJustification || !clinicalContextData.hasAny} style={{ ...S.cb("s"), color: P.justifTitleColor, opacity: clinicalContextData.hasAny ? 1 : 0.5 }}>{ldJustification ? "🤖 ⏳" : "🤖"}</button></div>
-                      <div style={{ ...S.rc, background: P.justifBg }}>{ldJustification ? <div style={S.ph}><LoadingDots text="Analizando justificación..." /></div> : justification ? <div dangerouslySetInnerHTML={{ __html: justification }} /> : <div style={S.ph}><div style={S.phI}>❓</div><div style={{ ...S.phT, color: P.justifTitleColor }}>Justificación bajo demanda</div><div style={S.phD}>{clinicalContextData.hasAny ? "Pulsa el robot para valorar la adecuación de la prueba antes de comenzar el informe." : "Completa antes la pestaña Petición."}</div></div>}</div>
-                    </div>
-                    <div style={{ padding: "14px 16px", background: P.inputBg, border: "1px solid " + P.inputBorder, borderRadius: 10 }}>
-                      <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.text2 }}>Motivo de petición original (sin procesar)</div>
-                      <div style={{ whiteSpace: "pre-wrap", color: P.text }}>{clinicalContextData.originalRequestText || "Sin motivo de petición pegado todavía."}</div>
+                    <div style={{ border: "1px solid " + P.justifHeaderBorder, borderRadius: 10, overflow: "hidden", minHeight: isJustificationEmpty ? 90 : 220, display: "flex", flexDirection: "column" }}>
+                      <div style={{ ...S.rh, background: P.justifHeader, borderColor: P.justifHeaderBorder }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.justifTitleColor }}>¿Justificada?</span>
+                        <button
+                          onClick={genJustification}
+                          disabled={ldJustification || !hasClinicalInput}
+                          title="Invocar IA para rellenar este cajón"
+                          style={S.aiMiniBtn(ldJustification || !hasClinicalInput, "linear-gradient(135deg,#0ea5e9,#0284c7)")}
+                        >
+                          {ldJustification ? "⏳" : "🤖"}
+                        </button>
+                      </div>
+                      <div style={{ ...S.rc, background: P.justifBg, flex: isJustificationEmpty ? "0 0 auto" : 1, padding: isJustificationEmpty ? "12px 16px" : S.rc.padding }}>
+                        {ldJustification ? <div style={S.ph}><LoadingDots text="Analizando justificación..." /></div> : justification ? <div dangerouslySetInnerHTML={{ __html: justification }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78, textShadow: "0 1px 0 rgba(0,0,0,0.08)" }}>Pulsa 🤖 para valorar la adecuación de la prueba antes de comenzar el informe.</div>}
+                      </div>
                     </div>
                   </div>
-                : <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Contexto clínico pendiente</div><div style={S.phD}>Cuando aportes datos del paciente, aquí verás un resumen estructurado editable y el motivo de petición original.</div></div>}
             </div>
           </div>}
 
           {rTab === "report" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={S.rh}><span style={S.rt}>Informe</span>{report && <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={S.rh}><span style={S.rt}>Informe</span><div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {isEditingReport ? (
                 <>
                   <button onClick={saveEditedReport} style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff" }}>💾 Guardar</button>
@@ -2370,16 +2460,16 @@ ${instruction}`;
                 <>
                   <button
                     onClick={() => adjustReport("essential")}
-                    disabled={ldReportAdjust || ldReport}
-                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: ldReportAdjust || ldReport ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}
+                    disabled={ldReportAdjust || ldReport || !report}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: ldReportAdjust || ldReport ? "wait" : !report ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold, opacity: !report ? 0.6 : 1 }}
                     title="Quita texto de relleno y deja solo lo clave"
                   >
                     {ldReportAdjust ? "⏳ Ajustando..." : "✂️ Dejar lo esencial"}
                   </button>
                   <button
                     onClick={() => adjustReport("enhance")}
-                    disabled={ldReportAdjust || ldReport}
-                    style={{ padding: "6px 12px", borderRadius: 8, border: "none", cursor: ldReportAdjust || ldReport ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#0ea5e9,#0284c7)", color: "#fff" }}
+                    disabled={ldReportAdjust || ldReport || !report}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "none", cursor: ldReportAdjust || ldReport ? "wait" : !report ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#0ea5e9,#0284c7)", color: "#fff", opacity: !report ? 0.6 : 1 }}
                     title="Añade normalidad estructurada y más detalle profesional"
                   >
                     {ldReportAdjust ? "⏳ Ajustando..." : "🧩 Añadir detalles"}
@@ -2387,8 +2477,8 @@ ${instruction}`;
                   <button onClick={startEditReport} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}>✏️ Editar</button>
                 </>
               )}
-              <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>
-            </div>}</div>
+              {report && <button onClick={cpText} style={{ padding: "6px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", background: copied === "t" ? "#22c55e" : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>{copied === "t" ? "✓ Copiado" : "📋 Copiar Informe"}</button>}
+            </div></div>
             <div className="rpt-content" style={S.rc}><style>{`
 .rpt-content [style*="border-top:1px solid #eee"],.rpt-content [style*="border-top:2px solid #888"]{border-top-color:transparent!important}
 .rpt-content [style*="border-bottom:1px solid #ccc"]{border-bottom-color:transparent!important}
@@ -2397,8 +2487,17 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
 .rpt-content p[style*="color:#555"],.rpt-content p[style*="color:#666"]{color:${P.text3}!important}
 .rpt-content p[style*="color:#444"]{color:${P.text2}!important}
 .rpt-content span[style*="color:#444"]{color:#aaa!important}` : ''}
-`}</style>{report ? (isEditingReport ? <div>
-                <div style={{ fontSize: 12, marginBottom: 10, color: P.text3 }}>Modo edición: modifica el contenido directamente manteniendo colores y formato.</div>
+`}</style>{showReportEditor ? <div>
+                <div style={{ fontSize: 12, marginBottom: 10, color: P.text3 }}>{report ? "Modo edición: modifica el contenido directamente manteniendo colores y formato." : "Plantilla editable lista: completa y da formato como en Word (negrita, subrayado, color y tamaño)."}</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("bold")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>B</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("underline")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: 12, fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>U</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("foreColor", "#1f2937")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: "#1f2937", fontSize: 12, cursor: "pointer" }}>A</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("foreColor", "#b91c1c")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: "#b91c1c", fontSize: 12, cursor: "pointer" }}>A</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("foreColor", "#1d4ed8")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: "#1d4ed8", fontSize: 12, cursor: "pointer" }}>A</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("fontSize", "3")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: 12, cursor: "pointer" }}>A-</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("fontSize", "5")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: 14, cursor: "pointer" }}>A+</button>
+                </div>
                 <div
                   ref={reportEditorRef}
                   contentEditable
@@ -2406,12 +2505,12 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                   onInput={syncEditedReportFromEditor}
                   onBlur={syncEditedReportFromEditor}
                   onPaste={handleReportEditorPaste}
-                  onMouseUp={captureReportSelection}
-                  onKeyUp={captureReportSelection}
+                  onMouseUp={isEditingReport ? captureReportSelection : undefined}
+                  onKeyUp={isEditingReport ? captureReportSelection : undefined}
                   style={{ border: "1px dashed " + P.goldBorderFocus, borderRadius: 10, padding: isMobile ? 10 : 14, background: P.inputBgFocus, minHeight: 240, outline: "none", lineHeight: 1.65 }}
-                  dangerouslySetInnerHTML={{ __html: editedReport }}
+                  dangerouslySetInnerHTML={{ __html: reportEditorHtml }}
                 />
-                {reportSelectionMenu.visible && <div
+                {isEditingReport && reportSelectionMenu.visible && <div
                   ref={reportSelectionMenuRef}
                   style={{
                     position: "fixed",
@@ -2464,31 +2563,79 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                     </button>
                   </div>
                 </div>}
-              </div> : <div ref={reportViewRef} dangerouslySetInnerHTML={{ __html: report }} />) : <div style={S.ph}><div style={S.phI}>📄</div><div style={S.phT}>El informe aparecerá aquí</div><div style={S.phD}>Dicta hallazgos en "Qué vemos".</div></div>}</div>
+              </div> : <div ref={reportViewRef} dangerouslySetInnerHTML={{ __html: report }} />}</div>
             {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal vinculado"], [isDark ? "#aaa" : "#444", "Relleno"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
 
           {rTab === "analysis" && <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? "14px 12px" : "16px 18px" }}>
-            <div style={{ border: "1px solid " + P.analysisHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
-              <div style={{ ...S.rh, background: P.analysisHeader, borderColor: P.analysisHeaderBorder }}><span style={{ ...S.rt, color: P.analysisTitleColor }}>Análisis del caso</span><button onClick={genAnalysis} disabled={ldAnalysis || !report} style={{ ...S.cb("s"), color: P.analysisTitleColor, opacity: report ? 1 : 0.5 }}>{ldAnalysis ? "🤖 ⏳" : "🤖"}</button></div>
-              <div style={{ ...S.rc, background: P.analysisBg }}>{ldAnalysis ? <div style={S.ph}><LoadingDots text="Analizando..." /></div> : analysis ? <div dangerouslySetInnerHTML={{ __html: analysis }} /> : <div style={S.ph}><div style={S.phI}>🔍</div><div style={{ ...S.phT, color: P.analysisTitleColor }}>Análisis bajo demanda</div><div style={S.phD}>{report ? "Pulsa el robot para generar el análisis." : "Genera primero un informe."}</div></div>}</div>
+            <div style={{ border: "1px solid " + P.analysisHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: isAnalysisEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: P.analysisHeader, borderColor: P.analysisHeaderBorder }}><span style={{ ...S.rt, color: P.analysisTitleColor }}>Análisis del caso</span></div>
+              <div style={{ ...S.rc, background: P.analysisBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isAnalysisEmpty ? "0 0 auto" : 1, padding: isAnalysisEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
+                <div style={{ flex: 1 }}>
+                  {ldAnalysis ? <div style={S.ph}><LoadingDots text="Analizando..." /></div> : analysis ? <div dangerouslySetInnerHTML={{ __html: analysis }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78 }}>Pulsa 🤖 para generar el análisis.</div>}
+                </div>
+                <button
+                  onClick={genAnalysis}
+                  disabled={ldAnalysis || !report}
+                  title="Invocar IA para rellenar este cajón"
+                  style={{ width: 40, minWidth: 40, borderRadius: 8, border: "none", cursor: ldAnalysis || !report ? "not-allowed" : "pointer", fontSize: 18, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#0ea5e9,#0284c7)", color: "#fff", opacity: ldAnalysis || !report ? 0.55 : 1 }}
+                >
+                  {ldAnalysis ? "⏳" : "🤖"}
+                </button>
+              </div>
             </div>
 
-            <div style={{ border: "1px solid " + P.keyIdeasHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
-              <div style={{ ...S.rh, background: P.keyIdeasHeader, borderColor: P.keyIdeasHeaderBorder }}><span style={{ ...S.rt, color: P.keyIdeasTitleColor }}>Ideas Clave</span><button onClick={genKeyIdeas} disabled={ldKeyIdeas || !report} style={{ ...S.cb("s"), color: P.keyIdeasTitleColor, opacity: report ? 1 : 0.5 }}>{ldKeyIdeas ? "🤖 ⏳" : "🤖"}</button></div>
-              <div style={{ ...S.rc, background: P.keyIdeasBg }}>{ldKeyIdeas ? <div style={S.ph}><LoadingDots text="Extrayendo ideas clave..." /></div> : keyIdeas ? <div dangerouslySetInnerHTML={{ __html: keyIdeas }} /> : <div style={S.ph}><div style={S.phI}>💡</div><div style={{ ...S.phT, color: P.keyIdeasTitleColor }}>Ideas clave bajo demanda</div><div style={S.phD}>{report ? "Pulsa el robot para generar ideas clave." : "Genera primero un informe."}</div></div>}</div>
+            <div style={{ border: "1px solid " + P.keyIdeasHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: isKeyIdeasEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: P.keyIdeasHeader, borderColor: P.keyIdeasHeaderBorder }}><span style={{ ...S.rt, color: P.keyIdeasTitleColor }}>Ideas Clave</span></div>
+              <div style={{ ...S.rc, background: P.keyIdeasBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isKeyIdeasEmpty ? "0 0 auto" : 1, padding: isKeyIdeasEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
+                <div style={{ flex: 1 }}>
+                  {ldKeyIdeas ? <div style={S.ph}><LoadingDots text="Extrayendo ideas clave..." /></div> : keyIdeas ? <div dangerouslySetInnerHTML={{ __html: keyIdeas }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78 }}>Pulsa 🤖 para generar ideas clave.</div>}
+                </div>
+                <button
+                  onClick={genKeyIdeas}
+                  disabled={ldKeyIdeas || !report}
+                  title="Invocar IA para rellenar este cajón"
+                  style={{ width: 40, minWidth: 40, borderRadius: 8, border: "none", cursor: ldKeyIdeas || !report ? "not-allowed" : "pointer", fontSize: 18, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#0ea5e9,#0284c7)", color: "#fff", opacity: ldKeyIdeas || !report ? 0.55 : 1 }}
+                >
+                  {ldKeyIdeas ? "⏳" : "🤖"}
+                </button>
+              </div>
             </div>
 
 
-            <div style={{ border: "1px solid " + P.diffDiagHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
-              <div style={{ ...S.rh, background: P.diffDiagHeader, borderColor: P.diffDiagHeaderBorder }}><span style={{ ...S.rt, color: P.diffDiagTitleColor }}>Diagnóstico Diferencial</span><button onClick={genDiffDiag} disabled={ldDiffDiag || !report} style={{ ...S.cb("s"), color: P.diffDiagTitleColor, opacity: report ? 1 : 0.5 }}>{ldDiffDiag ? "🤖 ⏳" : "🤖"}</button></div>
-              <div style={{ ...S.rc, background: P.diffDiagBg }}>{ldDiffDiag ? <div style={S.ph}><LoadingDots text="Generando diferencial..." /></div> : diffDiag ? <div dangerouslySetInnerHTML={{ __html: diffDiag }} /> : <div style={S.ph}><div style={S.phI}>🚦</div><div style={{ ...S.phT, color: P.diffDiagTitleColor }}>Diferencial bajo demanda</div><div style={S.phD}>{report ? "Pulsa el robot para generar diferencial." : "Genera primero un informe."}</div></div>}</div>
+            <div style={{ border: "1px solid " + P.diffDiagHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: isDiffDiagEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: P.diffDiagHeader, borderColor: P.diffDiagHeaderBorder }}><span style={{ ...S.rt, color: P.diffDiagTitleColor }}>Diagnóstico Diferencial</span></div>
+              <div style={{ ...S.rc, background: P.diffDiagBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isDiffDiagEmpty ? "0 0 auto" : 1, padding: isDiffDiagEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
+                <div style={{ flex: 1 }}>
+                  {ldDiffDiag ? <div style={S.ph}><LoadingDots text="Generando diferencial..." /></div> : diffDiag ? <div dangerouslySetInnerHTML={{ __html: diffDiag }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78 }}>Pulsa 🤖 para generar diferencial.</div>}
+                </div>
+                <button
+                  onClick={genDiffDiag}
+                  disabled={ldDiffDiag || !report}
+                  title="Invocar IA para rellenar este cajón"
+                  style={{ width: 40, minWidth: 40, borderRadius: 8, border: "none", cursor: ldDiffDiag || !report ? "not-allowed" : "pointer", fontSize: 18, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#0ea5e9,#0284c7)", color: "#fff", opacity: ldDiffDiag || !report ? 0.55 : 1 }}
+                >
+                  {ldDiffDiag ? "⏳" : "🤖"}
+                </button>
+              </div>
               {diffDiag && <div style={{ ...S.lg, borderColor: P.diffDiagHeaderBorder }}>{[["#dc2626", "Más probable"], ["#ea580c", "Probable"], ["#ca8a04", "Menos probable"], ["#16a34a", "Descartado"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
             </div>
 
-            <div style={{ border: "1px solid " + P.mindMapHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
-              <div style={{ ...S.rh, background: P.mindMapHeader, borderColor: P.mindMapHeaderBorder }}><span style={{ ...S.rt, color: P.mindMapTitleColor }}>Mapa Mental</span><button onClick={genMindMap} disabled={ldMindMap || !report} style={{ ...S.cb("s"), color: P.mindMapTitleColor, opacity: report ? 1 : 0.5 }}>{ldMindMap ? "🤖 ⏳" : "🤖"}</button></div>
-              <div style={{ ...S.rc, background: P.mindMapBg }}>{ldMindMap ? <div style={S.ph}><LoadingDots text="Generando mapa mental..." /></div> : mindMap ? <div dangerouslySetInnerHTML={{ __html: mindMap }} /> : <div style={S.ph}><div style={S.phI}>🧠</div><div style={{ ...S.phT, color: P.mindMapTitleColor }}>Mapa mental bajo demanda</div><div style={S.phD}>{report ? "Pulsa el robot para generar mapa mental." : "Genera primero un informe."}</div></div>}</div>
+            <div style={{ border: "1px solid " + P.mindMapHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: isMindMapEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: P.mindMapHeader, borderColor: P.mindMapHeaderBorder }}><span style={{ ...S.rt, color: P.mindMapTitleColor }}>Mapa Mental</span></div>
+              <div style={{ ...S.rc, background: P.mindMapBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isMindMapEmpty ? "0 0 auto" : 1, padding: isMindMapEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
+                <div style={{ flex: 1 }}>
+                  {ldMindMap ? <div style={S.ph}><LoadingDots text="Generando mapa mental..." /></div> : mindMap ? <div dangerouslySetInnerHTML={{ __html: mindMap }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78 }}>Pulsa 🤖 para generar mapa mental.</div>}
+                </div>
+                <button
+                  onClick={genMindMap}
+                  disabled={ldMindMap || !report}
+                  title="Invocar IA para rellenar este cajón"
+                  style={{ width: 40, minWidth: 40, borderRadius: 8, border: "none", cursor: ldMindMap || !report ? "not-allowed" : "pointer", fontSize: 18, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#0ea5e9,#0284c7)", color: "#fff", opacity: ldMindMap || !report ? 0.55 : 1 }}
+                >
+                  {ldMindMap ? "⏳" : "🤖"}
+                </button>
+              </div>
             </div>
           </div>}
 
