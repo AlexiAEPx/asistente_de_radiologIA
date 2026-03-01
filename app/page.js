@@ -2546,9 +2546,9 @@ ${instruction}`;
                           : <span style={{ color: P.text3, opacity: 0.78, textShadow: "0 1px 0 rgba(0,0,0,0.08)" }}>Pulsa 🤖 para ver un listado breve de hallazgos clave a buscar según este contexto clínico.</span>}
                       </div>
                     </div>
-                    <div style={{ border: "1px solid " + P.justifHeaderBorder, borderRadius: 10, overflow: "hidden", minHeight: isJustificationEmpty ? 90 : 220, display: "flex", flexDirection: "column" }}>
-                      <div style={{ ...S.rh, background: P.justifHeader, borderColor: P.justifHeaderBorder }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.justifTitleColor }}>¿Justificada?</span>
+                    <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10, minHeight: isJustificationEmpty ? 90 : 220, display: "flex", flexDirection: "column" }}>
+                      <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>¿Justificada?</span>
                         <button
                           onClick={genJustification}
                           disabled={ldJustification || !hasClinicalInput}
@@ -2558,7 +2558,7 @@ ${instruction}`;
                           {ldJustification ? "⏳" : "🤖"}
                         </button>
                       </div>
-                      <div style={{ ...S.rc, background: P.justifBg, flex: isJustificationEmpty ? "0 0 auto" : 1, padding: isJustificationEmpty ? "12px 16px" : S.rc.padding }}>
+                      <div style={{ ...S.rc, background: "transparent", border: "none", boxShadow: "none", padding: isJustificationEmpty ? 0 : S.rc.padding, flex: isJustificationEmpty ? "0 0 auto" : 1 }}>
                         {ldJustification ? <div style={S.ph}><LoadingDots text="Analizando justificación..." /></div> : justification ? <div dangerouslySetInnerHTML={{ __html: justification }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78, textShadow: "0 1px 0 rgba(0,0,0,0.08)" }}>Pulsa 🤖 para valorar la adecuación de la prueba antes de comenzar el informe.</div>}
                       </div>
                     </div>
