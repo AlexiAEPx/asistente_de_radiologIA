@@ -1153,8 +1153,13 @@ export default function Page() {
   const [reportSelectionText, setReportSelectionText] = useState("");
   const [ldReportSelectionAction, setLdReportSelectionAction] = useState(false);
   const activeTabMeta = TAB_UI_META[rTab] || TAB_UI_META.petition;
-  const activeTabSurface = `color-mix(in srgb, ${activeTabMeta.color} 12%, transparent)`;
-  const activeTabSoftBorder = `color-mix(in srgb, ${activeTabMeta.color} 38%, ${P.goldBorder})`;
+  const activeTabTone = rTab === "petition"
+    ? (isDark ? "rgba(34,197,94,0.16)" : "rgba(34,197,94,0.10)")
+    : rTab === "report"
+      ? (isDark ? "rgba(196,151,60,0.17)" : "rgba(196,151,60,0.11)")
+      : (isDark ? "rgba(14,165,233,0.16)" : "rgba(14,165,233,0.10)");
+  const activeTabSurface = `linear-gradient(180deg, ${activeTabTone}, transparent 38%)`;
+  const activeTabSoftBorder = `color-mix(in srgb, ${activeTabMeta.color} 50%, ${P.goldBorder})`;
   useEffect(() => {
     setClinicalContextDraft(clinicalContextData.structuredText || "");
     setClinicalRecommendations("");
@@ -2130,18 +2135,6 @@ ${instruction}`;
   const isDiffDiagEmpty = !ldDiffDiag && !diffDiag;
   const isMindMapEmpty = !ldMindMap && !mindMap;
   const hasClinicalInput = !!(clinicalContextDraft.trim() || clinicalContextData.hasAny);
-  const clinicalContextPreview = useMemo(() => {
-    const base = (clinicalContextDraft.trim() || clinicalContextData.structuredText || "").trim();
-    if (!base) {
-      return "CONTEXTO CLÍNICO:\n- Motivo de la petición\n- Antecedentes relevantes\n- Dato clínico clave";
-    }
-    if (/^CONTEXTO CLÍNICO:/i.test(base)) return base;
-    const keyLines = splitFreeTextIntoItems(base)
-      .map(line => line.replace(/^[\-•*]\s*/, "").trim())
-      .filter(Boolean)
-      .slice(0, 8);
-    return ["CONTEXTO CLÍNICO:", ...keyLines.map(line => `- ${line}`)].join("\n");
-  }, [clinicalContextDraft, clinicalContextData.structuredText]);
   const showReportEditor = isEditingReport || !report;
   const reportEditorHtml = editedReport || report || REPORT_TEMPLATE_HTML;
 
@@ -2444,7 +2437,7 @@ ${instruction}`;
 
         <div style={{ ...S.rp, boxShadow: `inset 0 2px 0 ${activeTabMeta.color}` }}>
           {rTab === "petition" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rc, background: P.chatPanelBg, fontSize: 13, lineHeight: 1.5 }}>
+            <div style={{ ...S.rc, background: `linear-gradient(180deg, ${activeTabTone}, ${P.chatPanelBg})`, fontSize: 13, lineHeight: 1.5 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ padding: "14px 16px", background: P.inputBgFocus, border: "1px solid " + P.chatInputBorderFocus, borderRadius: 10 }}>
                       <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -2474,17 +2467,14 @@ ${instruction}`;
                           </button>
                         </div>
                       </div>
-                      <div style={{ whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.45, color: P.text2, border: "1px dashed " + P.chatInputBorder, borderRadius: 8, background: P.chatInputBg, padding: "9px 10px", marginBottom: 8 }}>
-                        {clinicalContextPreview}
-                      </div>
                       <textarea
                         value={clinicalContextDraft}
                         onChange={(e) => setClinicalContextDraft(e.target.value)}
-                        placeholder={"CONTEXTO CLÍNICO:
+                        placeholder={`CONTEXTO CLÍNICO:
 - Motivo
 - Antecedentes
-- Hallazgo clave"}
-                        style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
+- Hallazgo clave`}
+                        style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + activeTabSoftBorder, background: `linear-gradient(180deg, ${activeTabTone}, ${P.chatInputBg})`, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
                       />
                     </div>
                     <div style={{ padding: "14px 16px", background: P.recoPanelBg, border: "1px solid " + P.recoPanelBorder, borderRadius: 10 }}>
