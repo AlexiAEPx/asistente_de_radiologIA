@@ -148,6 +148,17 @@ const TAB_UI_META = {
   analysis: { label: "Análisis", color: "#0ea5e9" },
 };
 
+const hexToRgba = (hex, alpha = 1) => {
+  const clean = String(hex || "").replace("#", "").trim();
+  if (clean.length !== 6) return `rgba(196,151,60,${alpha})`;
+  const value = Number.parseInt(clean, 16);
+  if (Number.isNaN(value)) return `rgba(196,151,60,${alpha})`;
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
 const buildCtxBlock = (c) => {
   const p = [];
   if (c.freeText) p.push("Información clínica general (sin clasificar):\n" + c.freeText);
@@ -838,14 +849,18 @@ function LoadingDots({ text }) {
   );
 }
 
-function Tab({ active, icon, label, status, stale, onClick, onRun, canRun, isRunning, P, compact }) {
+function Tab({ active, icon, label, status, stale, onClick, onRun, canRun, isRunning, P, compact, accentColor }) {
+  const accent = accentColor || P.gold;
+  const activeBg = active
+    ? `linear-gradient(135deg,${hexToRgba(accent, 0.22)},${hexToRgba(accent, 0.08)})`
+    : P.tabBtnBg;
   return (
     <button onClick={onClick} style={{
       display: "flex", alignItems: "center", gap: compact ? 3 : 5, padding: compact ? "7px 9px" : "9px 14px",
-      background: active ? P.tabBtnBgActive : P.tabBtnBg,
-      border: "1px solid " + (active ? P.tabShellBorder : P.tabBtnBorder),
-      borderBottom: active ? "1px solid " + P.gold : "1px solid " + P.tabBtnBorder,
-      color: active ? P.gold : P.text3, fontSize: compact ? 11 : 13, fontWeight: active ? 700 : 500,
+      background: activeBg,
+      border: "1px solid " + (active ? hexToRgba(accent, 0.45) : P.tabBtnBorder),
+      borderBottom: active ? "1px solid " + accent : "1px solid " + P.tabBtnBorder,
+      color: active ? accent : P.text3, fontSize: compact ? 11 : 13, fontWeight: active ? 700 : 500,
       cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap", fontFamily: "inherit",
       flexShrink: 0, borderRadius: 10, boxShadow: active ? "0 8px 18px rgba(0,0,0,0.12)" : "none",
     }}>
@@ -2118,9 +2133,9 @@ ${instruction}`;
   }), [analysis, keyIdeas, justification, diffDiag, mindMap, tabSignatures, tabInputsSignature]);
 
   const rightTabsConfig = [
-    { key: "petition", icon: "🩺", label: "Petición", run: null, loading: false, canRun: false },
-    { key: "report", icon: "📄", label: "Informe", run: null, loading: ldReport, canRun: false },
-    { key: "analysis", icon: "🔍", label: "Análisis", run: null, loading: false, canRun: false },
+    { key: "petition", icon: "🩺", label: "Petición", color: TAB_UI_META.petition.color, run: null, loading: false, canRun: false },
+    { key: "report", icon: "📄", label: "Informe", color: TAB_UI_META.report.color, run: null, loading: ldReport, canRun: false },
+    { key: "analysis", icon: "🔍", label: "Análisis", color: TAB_UI_META.analysis.color, run: null, loading: false, canRun: false },
   ];
   const isJustificationEmpty = !ldJustification && !justification;
   const isAnalysisEmpty = !ldAnalysis && !analysis;
@@ -2133,6 +2148,9 @@ ${instruction}`;
 
   const selectedModel = getModelByKey(model);
   const sm = selectedModel;
+  const tabAccent = activeTabMeta.color;
+  const tabSurfaceBg = `linear-gradient(180deg, ${hexToRgba(tabAccent, isDark ? 0.14 : 0.1)} 0%, ${hexToRgba(tabAccent, isDark ? 0.06 : 0.04)} 42%, transparent 100%)`;
+  const tabSurfaceBorder = hexToRgba(tabAccent, isDark ? 0.35 : 0.3);
   const S = {
     root: { display: "flex", flexDirection: "column", height: isMobile ? "auto" : "100vh", minHeight: isMobile ? "100vh" : undefined, width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: isMobile ? "auto" : "hidden", transition: "background 0.3s, color 0.3s" },
     hdr: { display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: isMobile ? "8px 12px" : "10px 18px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: isMobile ? 6 : 10, flexWrap: "wrap" },
@@ -2344,8 +2362,33 @@ ${instruction}`;
       )}
 
       <div ref={mainRef} style={S.main}>
-        <div style={S.lp}>
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid " + P.goldBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: P.bg2 }}>
+        <div style={{ ...S.lp, borderRight: isMobile ? "none" : "1px solid " + tabSurfaceBorder, background: tabSurfaceBg }}>
+          <div
+            data-tabbar=""
+            style={{
+              ...S.tb,
+              borderBottom: "1px solid " + tabSurfaceBorder,
+            }}
+          >
+            {rightTabsConfig.map(t => (
+              <Tab
+                key={t.key}
+                active={rTab === t.key}
+                icon={t.icon}
+                label={t.label}
+                status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
+                stale={!!staleTabs[t.key]}
+                onClick={() => openRightTab(t.key)}
+                onRun={t.run}
+                canRun={t.canRun}
+                isRunning={t.loading}
+                P={P}
+                compact={isMobile}
+                accentColor={t.color}
+              />
+            ))}
+          </div>
+          <div style={{ padding: "8px 12px", borderBottom: "1px solid " + tabSurfaceBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: hexToRgba(tabAccent, isDark ? 0.1 : 0.05) }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeTabMeta.color, boxShadow: `0 0 0 2px ${P.bg}` }} />
             Chat vinculado a: <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
           </div>
@@ -2414,30 +2457,10 @@ ${instruction}`;
           >{lpCollapsed ? "\u25B6" : "\u25C0"}</button>
         </div>
 
-        <div style={{ ...S.rp, boxShadow: `inset 0 2px 0 ${activeTabMeta.color}` }}>
-          <div
-            data-tabbar=""
-            style={{
-              ...S.tb,
-              borderBottom: "none",
-            }}
-          >
-            {rightTabsConfig.map(t => (
-              <Tab
-                key={t.key}
-                active={rTab === t.key}
-                icon={t.icon}
-                label={t.label}
-                status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
-                stale={!!staleTabs[t.key]}
-                onClick={() => openRightTab(t.key)}
-                onRun={t.run}
-                canRun={t.canRun}
-                isRunning={t.loading}
-                P={P}
-                compact={isMobile}
-              />
-            ))}
+        <div style={{ ...S.rp, boxShadow: `inset 0 2px 0 ${activeTabMeta.color}`, background: tabSurfaceBg }}>
+          <div style={{ padding: isMobile ? "8px 12px" : "9px 14px", borderBottom: "1px solid " + tabSurfaceBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: hexToRgba(tabAccent, isDark ? 0.1 : 0.05) }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeTabMeta.color, boxShadow: `0 0 0 2px ${P.bg}` }} />
+            Panel vinculado a: <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
           </div>
 
           {rTab === "petition" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
