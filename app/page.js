@@ -1958,6 +1958,9 @@ ${instruction}`;
     }
     setLdClinicalPolish(false);
   };
+  const handleClinicalContextBlur = () => {
+    setClinicalContextDraft((prev) => ensureClinicalContextFormat(prev));
+  };
   const genClinicalRecommendations = async () => {
     const text = clinicalContextDraft.trim() || clinicalContextData.structuredText || "";
     if (!text || ldClinicalRecommendations) return;
@@ -2519,7 +2522,8 @@ ${instruction}`;
                       </div>
                       <textarea
                         value={clinicalContextDraft}
-                        onChange={(e) => setClinicalContextDraft(ensureClinicalContextFormat(e.target.value))}
+                        onChange={(e) => setClinicalContextDraft(e.target.value)}
+                        onBlur={handleClinicalContextBlur}
                         placeholder="Escribe o pega aquí el contexto clínico..."
                         style={{ width: "100%", minHeight: 72, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
                       />
