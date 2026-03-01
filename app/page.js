@@ -2599,7 +2599,6 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                   onMouseUp={isEditingReport ? captureReportSelection : undefined}
                   onKeyUp={isEditingReport ? captureReportSelection : undefined}
                   style={{ border: "1px dashed " + P.goldBorderFocus, borderRadius: 10, padding: isMobile ? 10 : 14, background: P.inputBgFocus, minHeight: 240, outline: "none", lineHeight: 1.65 }}
-                  dangerouslySetInnerHTML={{ __html: reportEditorHtml }}
                 />
                 {isEditingReport && reportSelectionMenu.visible && <div
                   ref={reportSelectionMenuRef}
