@@ -227,7 +227,7 @@ const splitFreeTextIntoItems = (text = "") => String(text || "")
   .map((line) => line.trim())
   .filter(Boolean);
 
-const CLINICAL_CONTEXT_PREFIX = "Contexto clínico:";
+const CLINICAL_CONTEXT_PREFIX = "CONTEXTO CLÍNICO:";
 const CLINICAL_CONTEXT_TEMPLATE = `${CLINICAL_CONTEXT_PREFIX}\n- `;
 
 const ensureClinicalContextFormat = (raw = "") => {
