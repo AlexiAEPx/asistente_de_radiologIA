@@ -2391,10 +2391,6 @@ ${instruction}`;
               />
             ))}
           </div>
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid " + tabSurfaceBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: linkedHeaderBg }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeTabMeta.color, boxShadow: `0 0 0 2px ${P.bg}` }} />
-            <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
-          </div>
           {rTab === "petition" ? (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
               <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Chat de petición</span></div>
@@ -2461,11 +2457,6 @@ ${instruction}`;
         </div>
 
         <div style={{ ...S.rp, boxShadow: `inset 0 2px 0 ${activeTabMeta.color}`, background: tabSurfaceBg }}>
-          <div style={{ padding: isMobile ? "8px 12px" : "9px 14px", borderBottom: "1px solid " + tabSurfaceBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: linkedHeaderBg }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeTabMeta.color, boxShadow: `0 0 0 2px ${P.bg}` }} />
-            <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
-          </div>
-
           {rTab === "petition" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={{ ...S.rc, background: linkedPanelBg, fontSize: 13, lineHeight: 1.5 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
