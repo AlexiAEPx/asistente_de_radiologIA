@@ -1054,18 +1054,21 @@ export default function Page() {
 
   const [ctx, setCtx] = useState(emptyCtx);
   const [ctxSnap, setCtxSnap] = useState("");
+  const [pMsgs, setPMsgs] = useState([]);
   const [fMsgs, setFMsgs] = useState([]);
   const [cMsgs, setCMsgs] = useState([]);
+  const [pInput, setPInput] = useState("");
   const [fInput, setFInput] = useState("");
   const [cInput, setCInput] = useState("");
   const [report, setReport] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [model, setModel] = useState(DEFAULT_MODEL_KEY);
   const [lTab, setLTab] = useState("context");
-  const [rTab, setRTab] = useState("report");
+  const [rTab, setRTab] = useState("petition");
   const [ldReport, setLdReport] = useState(false);
   const [ldReportAdjust, setLdReportAdjust] = useState(false);
   const [ldAnalysis, setLdAnalysis] = useState(false);
+  const [ldPetitionChat, setLdPetitionChat] = useState(false);
   const [ldChat, setLdChat] = useState(false);
   const [keyIdeas, setKeyIdeas] = useState("");
   const [ldKeyIdeas, setLdKeyIdeas] = useState(false);
@@ -1091,19 +1094,11 @@ export default function Page() {
   const [showHistory, setShowHistory] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [closeAfterExport, setCloseAfterExport] = useState(false);
-  const [tabStatus, setTabStatus] = useState({
-    clinicalContext: "idle",
-    report: "idle",
-    analysis: "idle",
-    keyIdeas: "idle",
-    justification: "idle",
-    diffDiag: "idle",
-    mindMap: "idle",
-  });
+  const [tabStatus, setTabStatus] = useState({ petition: "idle", report: "idle", analysis: "idle" });
   const [tabSignatures, setTabSignatures] = useState({ analysis: "", keyIdeas: "", justification: "", diffDiag: "", mindMap: "" });
   const rightTabbarRef = useRef(null);
 
-  const clinicalContextData = useMemo(() => buildClinicalContextData(ctx, fMsgs, cMsgs), [ctx, fMsgs, cMsgs]);
+  const clinicalContextData = useMemo(() => buildClinicalContextData(ctx, fMsgs, pMsgs), [ctx, fMsgs, pMsgs]);
   const tabInputsSignature = useMemo(() => buildTabSignatures({ clinicalContextData, report, analysis, ctx, fMsgs, cMsgs }), [clinicalContextData, report, analysis, ctx, fMsgs, cMsgs]);
   const [clinicalContextDraft, setClinicalContextDraft] = useState("");
   const [ldClinicalPolish, setLdClinicalPolish] = useState(false);
@@ -1232,8 +1227,9 @@ export default function Page() {
     const diffDiagText = htmlToText(diffDiag);
     const mindMapText = htmlToText(mindMap);
     const ctxText = clinicalContextDraft.trim() || clinicalContextData.structuredText || "Sin contexto clínico estructurado.";
+    const petitionMsgs = pMsgs.map((m) => `${m.role === "user" ? "Usuario" : "Asistente"}: ${m.content}`).join("\n\n");
     const findingsMsgs = fMsgs.filter(m => m.role === "user").map((m, i) => `- ${i + 1}. ${m.content}`).join("\n");
-    const chatMsgs = cMsgs.map((m) => `${m.role === "user" ? "Usuario" : "Asistente"}: ${m.content}`).join("\n\n");
+    const analysisChatMsgs = cMsgs.map((m) => `${m.role === "user" ? "Usuario" : "Asistente"}: ${m.content}`).join("\n\n");
     const priorHistory = joinEntries(ctx.clinicalHistory) || "No aportado.";
     const priorReports = joinEntries(ctx.priorRadiology) || "No aportado.";
     const clinicalReportsText = joinEntries(ctx.clinicalReports) || "No aportado.";
@@ -1275,8 +1271,11 @@ export default function Page() {
       "## Hallazgos aportados por el usuario",
       findingsMsgs || "Sin hallazgos aportados.",
       "",
-      "## Chat del caso",
-      chatMsgs || "Sin chat libre.",
+      "## Chat de petición",
+      petitionMsgs || "Sin chat de petición.",
+      "",
+      "## Chat de análisis",
+      analysisChatMsgs || "Sin chat de análisis.",
       "",
       "## Análisis",
       analysisText || "No generado.",
@@ -1390,6 +1389,7 @@ export default function Page() {
 
   const buildCaseSnapshot = () => ({
     ctx,
+    pMsgs,
     fMsgs,
     cMsgs,
     report,
@@ -1400,6 +1400,7 @@ export default function Page() {
     mindMap,
     editedReport,
     isEditingReport,
+    pInput,
     fInput,
     cInput,
     lTab,
@@ -1436,6 +1437,7 @@ export default function Page() {
     const normalizedSnapCtx = normalizeCtx(snap.ctx || emptyCtx);
     setCtx(normalizedSnapCtx);
     setCtxSnap(JSON.stringify(normalizedSnapCtx));
+    setPMsgs(snap.pMsgs || []);
     setFMsgs(snap.fMsgs || []);
     setCMsgs(snap.cMsgs || []);
     setReport(snap.report || "");
@@ -1446,13 +1448,14 @@ export default function Page() {
     setMindMap(snap.mindMap || "");
     setEditedReport(snap.editedReport || snap.report || "");
     setIsEditingReport(!!snap.isEditingReport);
+    setPInput(snap.pInput || "");
     setFInput(snap.fInput || "");
     setCInput(snap.cInput || "");
     setLTab(snap.lTab || "context");
-    setRTab(snap.rTab || "report");
+    setRTab(snap.rTab || "petition");
     setModel(snap.model || DEFAULT_MODEL_KEY);
     setSpending(snap.spending || { totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
-    setTabStatus(snap.tabStatus || { clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
+    setTabStatus(snap.tabStatus || { petition: "idle", report: "idle", analysis: "idle" });
     setTabSignatures(snap.tabSignatures || { analysis: "", keyIdeas: "", justification: "", diffDiag: "", mindMap: "" });
     setShowClinicalHistory(!!snap.showClinicalHistory);
     setShowPriorRadiology(!!snap.showPriorRadiology);
@@ -1478,8 +1481,10 @@ export default function Page() {
   const dragging = useRef(false);
   const mainRef = useRef(null);
 
+  const pEndRef = useRef(null);
   const fEndRef = useRef(null);
   const cEndRef = useRef(null);
+  const pInpRef = useRef(null);
   const fInpRef = useRef(null);
   const cInpRef = useRef(null);
   const reportEditorRef = useRef(null);
@@ -1491,6 +1496,7 @@ export default function Page() {
     if (!isEditingReport) setEditedReport(report);
   }, [report, isEditingReport]);
 
+  useEffect(() => { pEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [pMsgs, ldPetitionChat]);
   useEffect(() => { fEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [fMsgs, ldReport]);
   useEffect(() => { cEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [cMsgs, ldChat]);
 
@@ -1590,6 +1596,21 @@ export default function Page() {
 
   const clean = (s) => { let t = s.trim(); if (t.startsWith("```html")) t = t.slice(7); else if (t.startsWith("```")) t = t.slice(3); if (t.endsWith("```")) t = t.slice(0, -3); return t.trim(); };
 
+
+
+  const sendPetitionChat = async () => {
+    const t = pInput.trim(); if (!t || ldPetitionChat) return;
+    setErr("");
+    const um = { role: "user", content: t };
+    setPMsgs(prev => [...prev, um]);
+    setPInput("");
+    setLdPetitionChat(true);
+    const merged = [ctx.freeText, t].filter(Boolean).join("\n").trim();
+    setCtx(prev => ({ ...prev, freeText: merged }));
+    setPMsgs(prev => [...prev, { role: "assistant", content: "✅ Contexto clínico añadido a la petición." }]);
+    setLdPetitionChat(false);
+  };
+
   const sendFindings = async () => {
     const t = fInput.trim(); if (!t || ldReport) return;
     setErr(""); const um = { role: "user", content: t }; const nm = [...fMsgs, um];
@@ -1638,6 +1659,7 @@ ${report}` }],
     } catch (e) {
       setErr("Error al ajustar informe: " + e.message);
     }
+    setLdPetitionChat(false);
     setLdReportAdjust(false);
   };
   const genAnalysis = async (focusTab = true) => {
@@ -1657,25 +1679,25 @@ ${report}` }],
     catch (e) { setErr("Error chat: " + e.message); } setLdChat(false);
   };
   const genKeyIdeas = async (focusTab = true) => {
-    if (!report || ldKeyIdeas) return; setLdKeyIdeas(true); setErr(""); if (focusTab) setRTab("keyIdeas");
+    if (!report || ldKeyIdeas) return; setLdKeyIdeas(true); setErr(""); if (focusTab) setRTab("analysis");
     try { const nextKeyIdeas = clean(await callAPI(KEY_IDEAS_SYS(ctx, report, analysis), [{ role: "user", content: "Genera las 10 ideas clave de este caso radiológico." }])); setKeyIdeas(nextKeyIdeas);
     setTabSignatures(prev => ({ ...prev, keyIdeas: tabInputsSignature.keyIdeas })); }
     catch (e) { setErr("Error ideas clave: " + e.message); } setLdKeyIdeas(false);
   };
   const genJustification = async (focusTab = true) => {
-    if (!clinicalContextData.hasAny || ldJustification) return; setLdJustification(true); setErr(""); if (focusTab) setRTab("justification");
+    if (!clinicalContextData.hasAny || ldJustification) return; setLdJustification(true); setErr(""); if (focusTab) setRTab("petition");
     try { const nextJustification = clean(await callAPI(JUSTIFICATION_SYS(ctx, report), [{ role: "user", content: "Analiza la justificación de esta prueba radiológica." }])); setJustification(nextJustification);
     setTabSignatures(prev => ({ ...prev, justification: tabInputsSignature.justification })); }
     catch (e) { setErr("Error justificación: " + e.message); } setLdJustification(false);
   };
   const genDiffDiag = async (focusTab = true) => {
-    if (!report || ldDiffDiag) return; setLdDiffDiag(true); setErr(""); if (focusTab) setRTab("diffDiag");
+    if (!report || ldDiffDiag) return; setLdDiffDiag(true); setErr(""); if (focusTab) setRTab("analysis");
     try { const nextDiffDiag = clean(await callAPI(DIFF_DIAG_SYS(ctx, report, analysis), [{ role: "user", content: "Genera el diagnóstico diferencial con código semáforo para este caso." }])); setDiffDiag(nextDiffDiag);
     setTabSignatures(prev => ({ ...prev, diffDiag: tabInputsSignature.diffDiag })); }
     catch (e) { setErr("Error diagnóstico diferencial: " + e.message); } setLdDiffDiag(false);
   };
   const genMindMap = async (focusTab = true) => {
-    if (!report || ldMindMap) return; setLdMindMap(true); setErr(""); if (focusTab) setRTab("mindMap");
+    if (!report || ldMindMap) return; setLdMindMap(true); setErr(""); if (focusTab) setRTab("analysis");
     try { const nextMindMap = clean(await callAPI(MIND_MAP_SYS(ctx, report, analysis), [{ role: "user", content: "Genera un mapa mental visual completo de este caso radiológico." }])); setMindMap(nextMindMap);
     setTabSignatures(prev => ({ ...prev, mindMap: tabInputsSignature.mindMap })); }
     catch (e) { setErr("Error mapa mental: " + e.message); } setLdMindMap(false);
@@ -1865,6 +1887,7 @@ ${instruction}`;
   };
   const clearAll = () => {
     setCtx(emptyCtx);
+    setPMsgs([]);
     setFMsgs([]);
     setCMsgs([]);
     setReport("");
@@ -1876,20 +1899,22 @@ ${instruction}`;
     setClinicalRecommendations("");
     setIsEditingReport(false);
     setEditedReport("");
+    setPInput("");
     setFInput("");
     setCInput("");
     setErr("");
     setCtxSnap("");
     setLTab("context");
-    setRTab("report");
+    setRTab("petition");
     setShowCodeDrop(false);
     setShowTotum(false);
     setShowClinicalHistory(false);
     setShowPriorRadiology(false);
     setShowClinicalReports(false);
+    setLdPetitionChat(false);
     setLdReportAdjust(false);
     setSpending({ totalCost: 0, inputTokens: 0, outputTokens: 0, calls: 0 });
-    setTabStatus({ clinicalContext: "idle", report: "idle", analysis: "idle", keyIdeas: "idle", justification: "idle", diffDiag: "idle", mindMap: "idle" });
+    setTabStatus({ petition: "idle", report: "idle", analysis: "idle" });
     setTabSignatures({ analysis: "", keyIdeas: "", justification: "", diffDiag: "", mindMap: "" });
     setShowExport(false);
     setCloseAfterExport(false);
@@ -1910,6 +1935,7 @@ ${instruction}`;
       joinEntries(ctx.clinicalHistory),
       joinEntries(ctx.priorRadiology),
       joinEntries(ctx.clinicalReports),
+      pMsgs.length > 0,
       fMsgs.length > 0,
       cMsgs.length > 0,
     ].some((item) => (typeof item === "boolean" ? item : Boolean(String(item || "").trim())));
@@ -1942,12 +1968,9 @@ ${instruction}`;
     if (!hasContent) return;
     setTabStatus(prev => ({ ...prev, [tabKey]: rTab === tabKey ? "read" : "unread" }));
   };
+  useEffect(() => { setTabSeenState("petition", !!clinicalContextData.hasAny); }, [clinicalContextData.hasAny, rTab]);
   useEffect(() => { setTabSeenState("report", !!report); }, [report, rTab]);
-  useEffect(() => { setTabSeenState("analysis", !!analysis); }, [analysis, rTab]);
-  useEffect(() => { setTabSeenState("keyIdeas", !!keyIdeas); }, [keyIdeas, rTab]);
-  useEffect(() => { setTabSeenState("justification", !!justification); }, [justification, rTab]);
-  useEffect(() => { setTabSeenState("diffDiag", !!diffDiag); }, [diffDiag, rTab]);
-  useEffect(() => { setTabSeenState("mindMap", !!mindMap); }, [mindMap, rTab]);
+  useEffect(() => { setTabSeenState("analysis", !!(analysis || keyIdeas || diffDiag || mindMap)); }, [analysis, keyIdeas, diffDiag, mindMap, rTab]);
 
   const staleTabs = useMemo(() => ({
     analysis: !!analysis && !!tabSignatures.analysis && tabSignatures.analysis !== tabInputsSignature.analysis,
@@ -1963,13 +1986,9 @@ ${instruction}`;
   };
 
   const rightTabsConfig = [
-    { key: "clinicalContext", icon: "🩺", label: "Contexto clínico", run: null, loading: false, canRun: false },
+    { key: "petition", icon: "🩺", label: "Petición", run: null, loading: false, canRun: false },
     { key: "report", icon: "📄", label: "Informe", run: null, loading: ldReport, canRun: false },
-    { key: "analysis", icon: "🔍", label: "Análisis", run: () => genAnalysis(false), loading: ldAnalysis, canRun: !!report },
-    { key: "keyIdeas", icon: "💡", label: "Ideas Clave", run: () => genKeyIdeas(false), loading: ldKeyIdeas, canRun: !!report },
-    { key: "diffDiag", icon: "🚦", label: "Diferencial", run: () => genDiffDiag(false), loading: ldDiffDiag, canRun: !!report },
-    { key: "mindMap", icon: "🧠", label: "Mapa Mental", run: () => genMindMap(false), loading: ldMindMap, canRun: !!report },
-    { key: "justification", icon: "❓", label: "¿Justificada?", run: () => genJustification(false), loading: ldJustification, canRun: !!clinicalContextData.hasAny },
+    { key: "analysis", icon: "🔍", label: "Análisis", run: null, loading: false, canRun: false },
   ];
 
   const selectedModel = getModelByKey(model);
@@ -2131,9 +2150,6 @@ ${instruction}`;
               </div>
             </>}
           </div>
-          <button onClick={() => setStoreHistoryLocal(v => !v)} style={S.clr}>
-            {storeHistoryLocal ? "Historial local: ON" : "Historial local: OFF"}
-          </button>
           <div style={{ position: "relative" }}>
             <button onClick={() => { setCloseAfterExport(false); setShowExport(!showExport); setShowHistory(false); }} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
               <span>Exportar</span>
@@ -2189,133 +2205,40 @@ ${instruction}`;
 
       <div ref={mainRef} style={S.main}>
         <div style={S.lp}>
-          <div data-tabbar="" style={S.tb}>
-            <Tab active={lTab === "context"} icon="📋" label="Qué sabemos" onClick={() => setLTab("context")} P={P} compact={isMobile} />
-            <Tab active={lTab === "findings"} icon="🔎" label="Qué vemos" badge={!!report && lTab !== "findings"} onClick={() => setLTab("findings")} P={P} compact={isMobile} />
-            <Tab active={lTab === "chat"} icon="💬" label="Chat" badge={cMsgs.length > 0 && lTab !== "chat"} onClick={() => setLTab("chat")} P={P} compact={isMobile} />
-          </div>
-          {lTab === "context" ? (
-            <div style={S.cs}>
-              <CollapsibleSection
-                title="🍲 El Totum Revolutum"
-                subtitle="No te compliques: pega aquí todo el churro (edad, informes, lo que sea) y nosotros nos apañamos"
-                isOpen={showTotum}
-                onToggle={() => setShowTotum(v => !v)}
-                P={P}
-              >
-                <textarea
-                  placeholder="Pega aquí todo lo que tengas: edad, sexo, antecedentes, informes previos, informes clínicos, motivo... todo revuelto, sin orden ni concierto."
-                  value={ctx.freeText}
-                  onChange={e => setCtx({ ...ctx, freeText: e.target.value })}
-                  onPaste={async (e) => {
-                    const files = readImagesFromPaste(e);
-                    if (!files.length) return;
-                    e.preventDefault();
-                    await appendPastedImagesToCtx("freeTextImages", files);
-                  }}
-                  onFocus={() => setFf("ft")}
-                  onBlur={() => setFf("")}
-                  style={{ ...S.taf(ff === "ft", 120), borderStyle: "dashed", marginBottom: 0 }}
-                />
-                {!!ctx.freeTextImages?.length && (
-                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {ctx.freeTextImages.map((img, idx) => (
-                      <div key={`ft_img_${idx}`} style={{ position: "relative" }}>
-                        <img src={img} alt={`Imagen totum ${idx + 1}`} style={{ width: 78, height: 78, objectFit: "cover", borderRadius: 8, border: "1px solid " + P.goldBorder }} />
-                        <button onClick={() => removeCtxImage("freeTextImages", idx)} style={{ position: "absolute", top: -6, right: -6, borderRadius: 999, border: "none", width: 18, height: 18, background: P.errorText, color: "#fff", fontSize: 11, lineHeight: 1, cursor: "pointer" }}>✕</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div style={{ fontSize: 11, color: P.text4, marginTop: 6 }}>💡 También puedes pegar imágenes con Ctrl/Cmd+V aquí.</div>
-              </CollapsibleSection>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                <div style={{ flex: 1, height: 1, background: P.goldBorder }} />
-                <span style={{ fontSize: 10, color: P.text4, textTransform: "uppercase", letterSpacing: 1.5, whiteSpace: "nowrap" }}>o si eres buen@ y quieres separar</span>
-                <div style={{ flex: 1, height: 1, background: P.goldBorder }} />
-              </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <div style={{ ...S.fg, flex: 1, minWidth: 120 }}>
-                  <label style={S.lb}>Edad</label>
-                  <input
-                    type="number"
-                    placeholder="—"
-                    value={ctx.age}
-                    onChange={e => setCtx({ ...ctx, age: e.target.value, birthYear: "" })}
-                    onFocus={() => setFf("ag")}
-                    onBlur={() => setFf("")}
-                    style={S.inp(ff === "ag")}
-                  />
-                </div>
-                <div style={{ ...S.fg, flex: 1, minWidth: 120 }}>
-                  <label style={S.lb}>Año de nacimiento</label>
-                  <input
-                    type="number"
-                    placeholder="Ej: 1984"
-                    value={ctx.birthYear || ""}
-                    onChange={e => {
-                      const birthYear = e.target.value;
-                      setCtx({ ...ctx, birthYear, age: getAgeFromBirthYear(birthYear) });
-                    }}
-                    onFocus={() => setFf("by")}
-                    onBlur={() => setFf("")}
-                    style={S.inp(ff === "by")}
-                  />
-                </div>
-                <div style={{ ...S.fg, flex: 1, minWidth: 120 }}><label style={S.lb}>Género</label><select value={ctx.gender} onChange={e => setCtx({ ...ctx, gender: e.target.value })} style={S.sel}><option value="" style={S.selOpt}>—</option><option value="Hombre" style={S.selOpt}>Hombre</option><option value="Mujer" style={S.selOpt}>Mujer</option></select></div>
-              </div>
-              <div style={S.fg}><label style={S.lb}>Estudio solicitado</label><input type="text" placeholder="Ej: TC tórax con CIV, RM lumbar..." value={ctx.studyRequested} onChange={e => setCtx({ ...ctx, studyRequested: e.target.value })} onFocus={() => setFf("st")} onBlur={() => setFf("")} style={S.inp(ff === "st")} /></div>
-              <div style={S.fg}><label style={S.lb}>Prioridad</label>
-                <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
-                  <button onClick={() => { setCtx({ ...ctx, priority: "programado" }); setShowCodeDrop(false); }} style={S.chip("programado", ctx.priority)}>Programado</button>
-                  <button onClick={() => { setCtx({ ...ctx, priority: "urgente" }); setShowCodeDrop(false); }} style={S.chip("urgente", ctx.priority)}>🔴 Urgente</button>
-                  <div style={{ position: "relative" }}>
-                    <button onClick={() => setShowCodeDrop(!showCodeDrop)} style={{ ...S.chip("codigo", ctx.priority), display: "flex", alignItems: "center", gap: 4 }}>
-                      🚨 {ctx.priority.startsWith("codigo_") ? { codigo_ictus: "C. Ictus", codigo_trauma: "C. Trauma", codigo_tep: "C. TEP", codigo_medula: "C. Médula", codigo_hemostasis: "C. Hemostasis" }[ctx.priority] : "Código"} ▾
-                    </button>
-                    {showCodeDrop && <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 10, padding: 5, zIndex: 100, minWidth: 200, boxShadow: P.dropdownShadow }}>
-                      {[["codigo_ictus", "🧠 Código Ictus"], ["codigo_trauma", "🩸 Código Trauma"], ["codigo_tep", "🫁 Código TEP"], ["codigo_medula", "🦴 Código Médula"], ["codigo_hemostasis", "🔴 Código Hemostasis"]].map(([v, l]) => (
-                        <div key={v} onClick={() => { setCtx({ ...ctx, priority: v }); setShowCodeDrop(false); }} style={{ padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: ctx.priority === v ? 600 : 400, background: ctx.priority === v ? P.ictusBg : "transparent", color: ctx.priority === v ? "#ef4444" : P.text2 }}>{l}</div>
-                      ))}
-                    </div>}
-                  </div>
-                </div></div>
-              <div style={S.fg}><label style={S.lb}>Motivo de petición</label><textarea placeholder="Justificación clínica..." value={ctx.reason} onChange={e => setCtx({ ...ctx, reason: e.target.value })} onPaste={async (e) => {
-                const files = readImagesFromPaste(e);
-                if (!files.length) return;
-                e.preventDefault();
-                await appendPastedImagesToCtx("reasonImages", files);
-              }} onFocus={() => setFf("re")} onBlur={() => setFf("")} style={{ ...S.taf(ff === "re", 84), minHeight: 84 }} /></div>
-              {!!ctx.reasonImages?.length && <div style={{ marginTop: -8, marginBottom: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>{ctx.reasonImages.map((img, idx) => <div key={`re_img_${idx}`} style={{ position: "relative" }}><img src={img} alt={`Imagen motivo ${idx + 1}`} style={{ width: 78, height: 78, objectFit: "cover", borderRadius: 8, border: "1px solid " + P.goldBorder }} /><button onClick={() => removeCtxImage("reasonImages", idx)} style={{ position: "absolute", top: -6, right: -6, borderRadius: 999, border: "none", width: 18, height: 18, background: P.errorText, color: "#fff", fontSize: 11, lineHeight: 1, cursor: "pointer" }}>✕</button></div>)}</div>}
-              <CollapsibleSection title="Antecedentes clínicos" isOpen={showClinicalHistory} onToggle={() => setShowClinicalHistory(v => !v)} P={P}>
-                <MultiEntryGroup entries={ctx.clinicalHistory} onChange={v => setCtx({ ...ctx, clinicalHistory: v })} label="Antecedentes clínicos" singularLabel="Antecedente" placeholder="Patologías, cirugías, tratamientos..." P={P} ff={ff} setFf={setFf} fieldKey="hi" />
-              </CollapsibleSection>
-              <CollapsibleSection title="Informes radiológicos previos" isOpen={showPriorRadiology} onToggle={() => setShowPriorRadiology(v => !v)} P={P}>
-                <MultiEntryGroup entries={ctx.priorRadiology} onChange={v => setCtx({ ...ctx, priorRadiology: v })} label="Informes radiológicos previos" singularLabel="Informe radiológico" placeholder="Pegar informe anterior..." P={P} ff={ff} setFf={setFf} fieldKey="ra" bigH={220} />
-              </CollapsibleSection>
-              <CollapsibleSection title="Informes clínicos" isOpen={showClinicalReports} onToggle={() => setShowClinicalReports(v => !v)} P={P}>
-                <MultiEntryGroup entries={ctx.clinicalReports} onChange={v => setCtx({ ...ctx, clinicalReports: v })} label="Informes clínicos" singularLabel="Informe clínico" placeholder="Altas, consultas, analíticas..." P={P} ff={ff} setFf={setFf} fieldKey="cl" bigH={220} />
-              </CollapsibleSection>
-            </div>
-          ) : lTab === "findings" ? (
+          {rTab === "petition" ? (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-              <div style={S.ca}>
-                {fMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>✍️</div><div style={S.phT}>Dicta tus hallazgos</div><div style={S.phD}>Escribe lo que ves en las imágenes.</div></div>}
-                {fMsgs.map((m, i) => m.role === "user" ? <div key={i} style={S.ub}>{m.content}</div> : <div key={i} style={S.ab}>✅ Informe {i === fMsgs.length - 1 ? "generado" : "actualizado"}</div>)}
+              <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Chat de petición</span></div>
+              <div style={{ ...S.ca, background: P.chatPanelBg }}>
+                {pMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>🩺</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Añade contexto clínico</div><div style={S.phD}>Todo lo que escribas aquí se incorpora a la petición.</div></div>}
+                {pMsgs.map((m, i) => m.role === "user" ? <div key={i} style={{ ...S.ub, background: P.chatBubbleUser }}>{m.content}</div> : <div key={i} style={{ ...S.ab, background: P.chatBubbleAsst, borderColor: P.chatBubbleAsstBorder, color: P.chatBubbleText }}>{m.content}</div>)}
+                {ldPetitionChat && <div style={S.ab}><LoadingDots text="Guardando contexto..." /></div>}
+                <div ref={pEndRef} />
+              </div>
+              <div style={{ ...S.ia, background: P.chatInputAreaBg }}><div style={S.ir}>
+                <textarea ref={pInpRef} value={pInput} onChange={e => setPInput(e.target.value)} onKeyDown={e => hk(e, sendPetitionChat)} onFocus={() => setFf("pc")} onBlur={() => setFf("")} placeholder="Motivo, antecedentes, datos clínicos..." style={{ ...S.ta(ff === "pc"), borderColor: ff === "pc" ? P.chatInputBorderFocus : P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor }} rows={2} disabled={ldPetitionChat} />
+                <button onClick={sendPetitionChat} disabled={ldPetitionChat || !pInput.trim()} style={{ ...S.sb(ldPetitionChat || !pInput.trim()), background: ldPetitionChat || !pInput.trim() ? (isDark ? "#333" : "#ccc") : P.chatSendBg }}>▶</button>
+              </div></div>
+            </div>
+          ) : rTab === "report" ? (
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+              <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Chat de informe</span></div>
+              <div style={{ ...S.ca, background: P.chatPanelBg }}>
+                {fMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>✍️</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Dicta hallazgos</div><div style={S.phD}>Escribe aquí lo que ves para redactar el informe.</div></div>}
+                {fMsgs.map((m, i) => m.role === "user" ? <div key={i} style={{ ...S.ub, background: P.chatBubbleUser }}>{m.content}</div> : <div key={i} style={{ ...S.ab, background: P.chatBubbleAsst, borderColor: P.chatBubbleAsstBorder, color: P.chatBubbleText }}>✅ Informe {i === fMsgs.length - 1 ? "generado" : "actualizado"}</div>)}
                 {ldReport && <div style={S.ab}><LoadingDots text="Redactando informe..." /></div>}
                 <div ref={fEndRef} />
               </div>
               {err && <div style={S.er}>{err}</div>}
-              <div style={S.ia}><div style={S.ir}>
-                <textarea ref={fInpRef} value={fInput} onChange={e => setFInput(e.target.value)} onKeyDown={e => hk(e, sendFindings)} onFocus={() => setFf("fi")} onBlur={() => setFf("")} placeholder='Hallazgos, "completa", "plagia"...' style={S.ta(ff === "fi")} rows={2} disabled={ldReport} />
-                <button onClick={sendFindings} disabled={ldReport || !fInput.trim()} style={S.sb(ldReport || !fInput.trim())}>▶</button>
-              </div><div style={S.ht}>Shift+Enter nueva línea</div></div>
+              <div style={{ ...S.ia, background: P.chatInputAreaBg }}><div style={S.ir}>
+                <textarea ref={fInpRef} value={fInput} onChange={e => setFInput(e.target.value)} onKeyDown={e => hk(e, sendFindings)} onFocus={() => setFf("fi")} onBlur={() => setFf("")} placeholder='Hallazgos, "completa", "plagia"...' style={{ ...S.ta(ff === "fi"), borderColor: ff === "fi" ? P.chatInputBorderFocus : P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor }} rows={2} disabled={ldReport} />
+                <button onClick={sendFindings} disabled={ldReport || !fInput.trim()} style={{ ...S.sb(ldReport || !fInput.trim()), background: ldReport || !fInput.trim() ? (isDark ? "#333" : "#ccc") : P.chatSendBg }}>▶</button>
+              </div></div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-              <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Chat libre</span></div>
+              <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Chat de análisis</span></div>
               <div style={{ ...S.ca, background: P.chatPanelBg }}>
-                {cMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>💬</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Consulta lo que necesites</div><div style={S.phD}>Con todo el contexto del caso.</div></div>}
+                {cMsgs.length === 0 && <div style={S.ph}><div style={S.phI}>💬</div><div style={{ ...S.phT, color: P.chatTitleColor }}>Consulta lo que necesites</div><div style={S.phD}>Debate sobre el caso con el informe y el análisis.</div></div>}
                 {cMsgs.map((m, i) => m.role === "user" ? <div key={i} style={{ ...S.ub, background: P.chatBubbleUser }}>{m.content}</div> : <div key={i} style={{ ...S.ab, background: P.chatBubbleAsst, borderColor: P.chatBubbleAsstBorder, color: P.chatBubbleText }}><div dangerouslySetInnerHTML={{ __html: m.content }} /></div>)}
                 {ldChat && <div style={S.ab}><LoadingDots text="Pensando..." /></div>}
                 <div ref={cEndRef} />
@@ -2382,7 +2305,7 @@ ${instruction}`;
             <button onClick={() => scrollRightTabs(220)} style={S.tabNavBtn} title="Ver pestañas siguientes">▶</button>
           </div>
 
-          {rTab === "clinicalContext" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+          {rTab === "petition" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}>
               <span style={{ ...S.rt, color: P.chatTitleColor }}>Contexto clínico</span>
               {!!clinicalContextData.hasAny && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2422,6 +2345,10 @@ ${instruction}`;
                     <div style={{ padding: "14px 16px", background: P.recoPanelBg, border: "1px solid " + P.recoPanelBorder, borderRadius: 10 }}>
                       <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>🤖 Recomendaciones para este caso</div>
                       <div style={{ whiteSpace: "pre-wrap", color: P.text }}>{clinicalRecommendations || "Genera recomendaciones para ver un listado breve de hallazgos clave a buscar según este contexto clínico."}</div>
+                    </div>
+                    <div style={{ border: "1px solid " + P.justifHeaderBorder, borderRadius: 10, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
+                      <div style={{ ...S.rh, background: P.justifHeader, borderColor: P.justifHeaderBorder }}><span style={{ ...S.rt, color: P.justifTitleColor }}>¿Justificada?</span><button onClick={genJustification} disabled={ldJustification || !clinicalContextData.hasAny} style={{ ...S.cb("s"), color: P.justifTitleColor, opacity: clinicalContextData.hasAny ? 1 : 0.5 }}>{ldJustification ? "🤖 ⏳" : "🤖"}</button></div>
+                      <div style={{ ...S.rc, background: P.justifBg }}>{ldJustification ? <div style={S.ph}><LoadingDots text="Analizando justificación..." /></div> : justification ? <div dangerouslySetInnerHTML={{ __html: justification }} /> : <div style={S.ph}><div style={S.phI}>❓</div><div style={{ ...S.phT, color: P.justifTitleColor }}>Justificación bajo demanda</div><div style={S.phD}>{clinicalContextData.hasAny ? "Pulsa el robot para valorar la adecuación de la prueba antes de comenzar el informe." : "Completa antes la pestaña Petición."}</div></div>}</div>
                     </div>
                     <div style={{ padding: "14px 16px", background: P.inputBg, border: "1px solid " + P.inputBorder, borderRadius: 10 }}>
                       <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.text2 }}>Motivo de petición original (sin procesar)</div>
@@ -2541,30 +2468,28 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
             {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal vinculado"], [isDark ? "#aaa" : "#444", "Relleno"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
 
-          {rTab === "analysis" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.analysisHeader, borderColor: P.analysisHeaderBorder }}><span style={{ ...S.rt, color: P.analysisTitleColor }}>Análisis del caso</span>{analysis && <button onClick={genAnalysis} disabled={ldAnalysis} style={{ ...S.cb("s"), color: P.analysisTitleColor }}>🔄 Regenerar</button>}</div>
-            <div style={{ ...S.rc, background: P.analysisBg }}>{ldAnalysis ? <div style={S.ph}><LoadingDots text="Analizando..." /></div> : analysis ? <div dangerouslySetInnerHTML={{ __html: analysis }} /> : <div style={S.ph}><div style={S.phI}>🔍</div><div style={{ ...S.phT, color: P.analysisTitleColor }}>Análisis bajo demanda</div><div style={S.phD}>{report ? "Genera diferencial, escalas y recomendaciones." : "Genera primero un informe."}</div>{report && <button onClick={genAnalysis} style={S.aBtn}>🔍 Analizar caso</button>}</div>}</div>
-          </div>}
+          {rTab === "analysis" && <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? "14px 12px" : "16px 18px" }}>
+            <div style={{ border: "1px solid " + P.analysisHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: P.analysisHeader, borderColor: P.analysisHeaderBorder }}><span style={{ ...S.rt, color: P.analysisTitleColor }}>Análisis del caso</span><button onClick={genAnalysis} disabled={ldAnalysis || !report} style={{ ...S.cb("s"), color: P.analysisTitleColor, opacity: report ? 1 : 0.5 }}>{ldAnalysis ? "🤖 ⏳" : "🤖"}</button></div>
+              <div style={{ ...S.rc, background: P.analysisBg }}>{ldAnalysis ? <div style={S.ph}><LoadingDots text="Analizando..." /></div> : analysis ? <div dangerouslySetInnerHTML={{ __html: analysis }} /> : <div style={S.ph}><div style={S.phI}>🔍</div><div style={{ ...S.phT, color: P.analysisTitleColor }}>Análisis bajo demanda</div><div style={S.phD}>{report ? "Pulsa el robot para generar el análisis." : "Genera primero un informe."}</div></div>}</div>
+            </div>
 
-          {rTab === "keyIdeas" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.keyIdeasHeader, borderColor: P.keyIdeasHeaderBorder }}><span style={{ ...S.rt, color: P.keyIdeasTitleColor }}>Ideas Clave</span>{keyIdeas && <button onClick={genKeyIdeas} disabled={ldKeyIdeas} style={{ ...S.cb("s"), color: P.keyIdeasTitleColor }}>🔄 Regenerar</button>}</div>
-            <div style={{ ...S.rc, background: P.keyIdeasBg }}>{ldKeyIdeas ? <div style={S.ph}><LoadingDots text="Extrayendo ideas clave..." /></div> : keyIdeas ? <div dangerouslySetInnerHTML={{ __html: keyIdeas }} /> : <div style={S.ph}><div style={S.phI}>💡</div><div style={{ ...S.phT, color: P.keyIdeasTitleColor }}>Ideas clave bajo demanda</div><div style={S.phD}>{report ? "Genera un resumen de 10 ideas clave que llevarte de este caso." : "Genera primero un informe."}</div>{report && <button onClick={genKeyIdeas} style={{ ...S.aBtn, background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>💡 Generar Ideas Clave</button>}</div>}</div>
-          </div>}
+            <div style={{ border: "1px solid " + P.keyIdeasHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: P.keyIdeasHeader, borderColor: P.keyIdeasHeaderBorder }}><span style={{ ...S.rt, color: P.keyIdeasTitleColor }}>Ideas Clave</span><button onClick={genKeyIdeas} disabled={ldKeyIdeas || !report} style={{ ...S.cb("s"), color: P.keyIdeasTitleColor, opacity: report ? 1 : 0.5 }}>{ldKeyIdeas ? "🤖 ⏳" : "🤖"}</button></div>
+              <div style={{ ...S.rc, background: P.keyIdeasBg }}>{ldKeyIdeas ? <div style={S.ph}><LoadingDots text="Extrayendo ideas clave..." /></div> : keyIdeas ? <div dangerouslySetInnerHTML={{ __html: keyIdeas }} /> : <div style={S.ph}><div style={S.phI}>💡</div><div style={{ ...S.phT, color: P.keyIdeasTitleColor }}>Ideas clave bajo demanda</div><div style={S.phD}>{report ? "Pulsa el robot para generar ideas clave." : "Genera primero un informe."}</div></div>}</div>
+            </div>
 
-          {rTab === "justification" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.justifHeader, borderColor: P.justifHeaderBorder }}><span style={{ ...S.rt, color: P.justifTitleColor }}>¿Justificada?</span>{justification && <button onClick={genJustification} disabled={ldJustification} style={{ ...S.cb("s"), color: P.justifTitleColor }}>🔄 Regenerar</button>}</div>
-            <div style={{ ...S.rc, background: P.justifBg }}>{ldJustification ? <div style={S.ph}><LoadingDots text="Analizando justificación..." /></div> : justification ? <div dangerouslySetInnerHTML={{ __html: justification }} /> : <div style={S.ph}><div style={S.phI}>❓</div><div style={{ ...S.phT, color: P.justifTitleColor }}>Justificación bajo demanda</div><div style={S.phD}>{clinicalContextData.hasAny ? "Analiza la adecuación de la prueba con lo que ya sabemos. No hace falta esperar al informe." : "Completa antes la pestaña 'Qué sabemos'."}</div>{clinicalContextData.hasAny && <button onClick={genJustification} style={{ ...S.aBtn, background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>❓ Analizar Justificación</button>}</div>}</div>
-          </div>}
 
-          {rTab === "diffDiag" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.diffDiagHeader, borderColor: P.diffDiagHeaderBorder }}><span style={{ ...S.rt, color: P.diffDiagTitleColor }}>Diagnóstico Diferencial</span>{diffDiag && <button onClick={genDiffDiag} disabled={ldDiffDiag} style={{ ...S.cb("s"), color: P.diffDiagTitleColor }}>🔄 Regenerar</button>}</div>
-            <div style={{ ...S.rc, background: P.diffDiagBg }}>{ldDiffDiag ? <div style={S.ph}><LoadingDots text="Generando diferencial..." /></div> : diffDiag ? <div dangerouslySetInnerHTML={{ __html: diffDiag }} /> : <div style={S.ph}><div style={S.phI}>🚦</div><div style={{ ...S.phT, color: P.diffDiagTitleColor }}>Diferencial bajo demanda</div><div style={S.phD}>{report ? "Diagnóstico diferencial con código semáforo de probabilidades." : "Genera primero un informe."}</div>{report && <button onClick={genDiffDiag} style={{ ...S.aBtn, background: "linear-gradient(135deg,#ef4444,#dc2626)" }}>🚦 Generar Diferencial</button>}</div>}</div>
-            {diffDiag && <div style={{ ...S.lg, borderColor: P.diffDiagHeaderBorder }}>{[["#dc2626", "Más probable"], ["#ea580c", "Probable"], ["#ca8a04", "Menos probable"], ["#16a34a", "Descartado"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
-          </div>}
+            <div style={{ border: "1px solid " + P.diffDiagHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: P.diffDiagHeader, borderColor: P.diffDiagHeaderBorder }}><span style={{ ...S.rt, color: P.diffDiagTitleColor }}>Diagnóstico Diferencial</span><button onClick={genDiffDiag} disabled={ldDiffDiag || !report} style={{ ...S.cb("s"), color: P.diffDiagTitleColor, opacity: report ? 1 : 0.5 }}>{ldDiffDiag ? "🤖 ⏳" : "🤖"}</button></div>
+              <div style={{ ...S.rc, background: P.diffDiagBg }}>{ldDiffDiag ? <div style={S.ph}><LoadingDots text="Generando diferencial..." /></div> : diffDiag ? <div dangerouslySetInnerHTML={{ __html: diffDiag }} /> : <div style={S.ph}><div style={S.phI}>🚦</div><div style={{ ...S.phT, color: P.diffDiagTitleColor }}>Diferencial bajo demanda</div><div style={S.phD}>{report ? "Pulsa el robot para generar diferencial." : "Genera primero un informe."}</div></div>}</div>
+              {diffDiag && <div style={{ ...S.lg, borderColor: P.diffDiagHeaderBorder }}>{[["#dc2626", "Más probable"], ["#ea580c", "Probable"], ["#ca8a04", "Menos probable"], ["#16a34a", "Descartado"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
+            </div>
 
-          {rTab === "mindMap" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-            <div style={{ ...S.rh, background: P.mindMapHeader, borderColor: P.mindMapHeaderBorder }}><span style={{ ...S.rt, color: P.mindMapTitleColor }}>Mapa Mental</span>{mindMap && <button onClick={genMindMap} disabled={ldMindMap} style={{ ...S.cb("s"), color: P.mindMapTitleColor }}>🔄 Regenerar</button>}</div>
-            <div style={{ ...S.rc, background: P.mindMapBg }}>{ldMindMap ? <div style={S.ph}><LoadingDots text="Generando mapa mental..." /></div> : mindMap ? <div dangerouslySetInnerHTML={{ __html: mindMap }} /> : <div style={S.ph}><div style={S.phI}>🧠</div><div style={{ ...S.phT, color: P.mindMapTitleColor }}>Mapa mental bajo demanda</div><div style={S.phD}>{report ? "Genera un mapa mental visual que organiza toda la información del caso de forma jerárquica." : "Genera primero un informe."}</div>{report && <button onClick={genMindMap} style={{ ...S.aBtn, background: "linear-gradient(135deg,#0ea5e9,#0284c7)" }}>🧠 Generar Mapa Mental</button>}</div>}</div>
+            <div style={{ border: "1px solid " + P.mindMapHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: P.mindMapHeader, borderColor: P.mindMapHeaderBorder }}><span style={{ ...S.rt, color: P.mindMapTitleColor }}>Mapa Mental</span><button onClick={genMindMap} disabled={ldMindMap || !report} style={{ ...S.cb("s"), color: P.mindMapTitleColor, opacity: report ? 1 : 0.5 }}>{ldMindMap ? "🤖 ⏳" : "🤖"}</button></div>
+              <div style={{ ...S.rc, background: P.mindMapBg }}>{ldMindMap ? <div style={S.ph}><LoadingDots text="Generando mapa mental..." /></div> : mindMap ? <div dangerouslySetInnerHTML={{ __html: mindMap }} /> : <div style={S.ph}><div style={S.phI}>🧠</div><div style={{ ...S.phT, color: P.mindMapTitleColor }}>Mapa mental bajo demanda</div><div style={S.phD}>{report ? "Pulsa el robot para generar mapa mental." : "Genera primero un informe."}</div></div>}</div>
+            </div>
           </div>}
 
         </div>
