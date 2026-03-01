@@ -1,10 +1,9 @@
 const {
-  ContractError,
   normalizeClinicalReport,
   normalizeClinicalRequest,
   normalizeQAResult,
 } = require("../../../lib/server/contracts");
-const { badRequest, parseJson, serverError } = require("../../../lib/server/http");
+const { handleRouteError, parseJson } = require("../../../lib/server/http");
 
 const buildDeterministicQA = (request, report) => {
   const issues = [];
@@ -53,9 +52,6 @@ export async function POST(request) {
 
     return Response.json({ request: clinicalRequest, report, qa });
   } catch (error) {
-    if (error instanceof ContractError) {
-      return badRequest(error.message, error.details);
-    }
-    return serverError(error);
+    return handleRouteError(error);
   }
 }

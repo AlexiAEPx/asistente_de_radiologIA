@@ -1,9 +1,9 @@
 const { callLLM } = require("../../../lib/server/llm");
-const { serverError } = require("../../../lib/server/http");
+const { handleRouteError, parseJson } = require("../../../lib/server/http");
 
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const body = await parseJson(request);
     const result = await callLLM(body);
 
     if (result.error) {
@@ -22,6 +22,6 @@ export async function POST(request) {
       deprecation: "Temporary compatibility endpoint. Migrate to JSON-first endpoints.",
     });
   } catch (error) {
-    return serverError(error);
+    return handleRouteError(error);
   }
 }

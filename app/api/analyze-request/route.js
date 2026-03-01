@@ -1,5 +1,5 @@
-const { ContractError, normalizeClinicalRequest } = require("../../../lib/server/contracts");
-const { badRequest, parseJson, serverError } = require("../../../lib/server/http");
+const { normalizeClinicalRequest } = require("../../../lib/server/contracts");
+const { handleRouteError, parseJson } = require("../../../lib/server/http");
 
 export async function POST(request) {
   try {
@@ -17,9 +17,6 @@ export async function POST(request) {
 
     return Response.json(output);
   } catch (error) {
-    if (error instanceof ContractError) {
-      return badRequest(error.message, error.details);
-    }
-    return serverError(error);
+    return handleRouteError(error);
   }
 }
