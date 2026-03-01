@@ -1530,9 +1530,58 @@ export default function Page() {
   const reportSelectionRangeRef = useRef(null);
   const reportSelectionMenuRef = useRef(null);
 
+  const normalizeLabel = (text = "") => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const hasClinicalContextSeed = !!(clinicalContextDraft.trim() || clinicalContextData.structuredText);
+
+  const buildClinicalContextSectionHtml = (rawText = "") => {
+    const text = String(rawText || "").trim();
+    if (!text) return '<p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Sin contexto clínico confirmado]</p>';
+
+    const lines = text
+      .split(/\r?\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line) => normalizeLabel(line) !== "contexto clinico:")
+      .map((line) => line.replace(/^[-•]\s*/, ""));
+
+    if (!lines.length) return `<p style="margin:0 0 16px 0;color:#1f2937;">${esc(text)}</p>`;
+
+    return `<ul style="margin:0 0 16px 1.2em;padding:0;color:#1f2937;">${lines.map((line) => `<li style="margin:0 0 6px 0;">${esc(line)}</li>`).join("")}</ul>`;
+  };
+
+  const replaceClinicalContextSection = (baseHtml, clinicalText) => {
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = baseHtml || REPORT_TEMPLATE_HTML;
+
+    const headings = Array.from(wrapper.querySelectorAll("h1,h2,h3,h4,h5,h6"));
+    const targetHeading = headings.find((h) => normalizeLabel(h.textContent).includes("contexto clinico"));
+    if (!targetHeading) return null;
+
+    const replacement = document.createElement("div");
+    replacement.setAttribute("data-clinical-context-filled", "true");
+    replacement.innerHTML = buildClinicalContextSectionHtml(clinicalText);
+
+    let node = targetHeading.nextElementSibling;
+    if (node && !/^H[1-6]$/.test(node.tagName)) {
+      node.replaceWith(replacement);
+    } else {
+      targetHeading.insertAdjacentElement("afterend", replacement);
+    }
+
+    return wrapper.innerHTML;
+  };
+
   useEffect(() => {
     if (!isEditingReport) setEditedReport(report);
   }, [report, isEditingReport]);
+
+  useEffect(() => {
+    if (!reportEditorRef.current) return;
+    const nextHtml = editedReport || report || REPORT_TEMPLATE_HTML;
+    if (reportEditorRef.current.innerHTML !== nextHtml) {
+      reportEditorRef.current.innerHTML = nextHtml;
+    }
+  }, [isEditingReport, report, editedReport]);
 
   useEffect(() => {
     if (!report && !editedReport) setEditedReport(REPORT_TEMPLATE_HTML);
@@ -1883,26 +1932,31 @@ ${instruction}`;
     }
     setLdClinicalRecommendations(false);
   };
-  const confirmContextAndStartReport = async () => {
-    const seed = (clinicalContextDraft.trim() || clinicalContextData.structuredText || "").trim();
-    if (!seed || ldReport || report || fMsgs.length > 0) return;
+  const syncClinicalContextIntoReport = ({ openReportTab = false } = {}) => {
+    const contextText = (clinicalContextDraft.trim() || clinicalContextData.structuredText || "").trim();
+    if (!contextText) return;
     setErr("");
-    setLdReport(true);
-    setRTab("report");
-    if (isMobile) setMobilePanel("right");
-    const seedMessage = { role: "user", content: `Contexto clínico confirmado:\n${seed}` };
-    const messages = [seedMessage];
-    setFMsgs(messages);
-    try {
-      const h = clean(await callAPI(REPORT_SYS(ctx, isDark, seed), messages));
-      setFMsgs(prev => [...prev, { role: "assistant", content: h }]);
-      setReport(h);
-      setCtxSnap(JSON.stringify(ctx));
-      saveToHistory(h, ctx);
-    } catch (e) {
-      setErr("Error informe: " + e.message);
+
+    const baseHtml = isEditingReport
+      ? (reportEditorRef.current?.innerHTML || editedReport || report || REPORT_TEMPLATE_HTML)
+      : (report || editedReport || REPORT_TEMPLATE_HTML);
+
+    const nextHtml = replaceClinicalContextSection(baseHtml, contextText);
+    if (!nextHtml) {
+      setErr("No se encontró el apartado 'Contexto Clínico' en el informe para actualizarlo.");
+      return;
     }
-    setLdReport(false);
+
+    if (isEditingReport && reportEditorRef.current) {
+      reportEditorRef.current.innerHTML = nextHtml;
+    }
+    setEditedReport(nextHtml);
+    setReport(nextHtml);
+
+    if (openReportTab) {
+      setRTab("report");
+      if (isMobile) setMobilePanel("right");
+    }
   };
   const cpHtml = async () => { if (!report) return; try { await navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([report], { type: "text/html" }), "text/plain": new Blob([report], { type: "text/plain" }) })]); } catch { await navigator.clipboard.writeText(report); } setCopied("h"); setTimeout(() => setCopied(""), 2500); };
   const syncEditedReportFromEditor = () => {
@@ -2381,12 +2435,12 @@ ${instruction}`;
                       <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button
-                            onClick={confirmContextAndStartReport}
-                            disabled={ldReport || !clinicalContextDraft.trim() || !!report || fMsgs.length > 0}
-                            title="Confirmar este contexto y empezar el informe automáticamente"
-                            style={{ padding: "6px 10px", borderRadius: 8, border: "none", cursor: ldReport || !clinicalContextDraft.trim() || !!report || fMsgs.length > 0 ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", opacity: ldReport || !clinicalContextDraft.trim() || !!report || fMsgs.length > 0 ? 0.55 : 1 }}
+                            onClick={() => syncClinicalContextIntoReport({ openReportTab: true })}
+                            disabled={!hasClinicalContextSeed}
+                            title="Pasar este contexto clínico al apartado de Contexto Clínico del informe"
+                            style={{ padding: "6px 10px", borderRadius: 8, border: "none", cursor: !hasClinicalContextSeed ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#22c55e,#16a34a)", color: "#fff", opacity: !hasClinicalContextSeed ? 0.55 : 1 }}
                           >
-                            {ldReport ? "⏳" : "✅"}
+                            🧲➡️📄
                           </button>
                           <button
                             onClick={polishClinicalContext}
@@ -2458,6 +2512,14 @@ ${instruction}`;
                 </>
               ) : (
                 <>
+                  <button
+                    onClick={() => syncClinicalContextIntoReport()}
+                    disabled={!hasClinicalContextSeed}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: !hasClinicalContextSeed ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold, opacity: !hasClinicalContextSeed ? 0.6 : 1 }}
+                    title="Recuperar el contexto clínico de la petición y rellenar solo ese apartado"
+                  >
+                    🩺⇢ Contexto
+                  </button>
                   <button
                     onClick={() => adjustReport("essential")}
                     disabled={ldReportAdjust || ldReport || !report}
