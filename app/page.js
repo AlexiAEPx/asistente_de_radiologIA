@@ -439,19 +439,19 @@ const buildClinicalContextData = (c, fMsgs, cMsgs) => {
 const REPORT_TEMPLATE_HTML = `
   <div data-report-template="true" style="font-size:15px;line-height:1.65;">
     <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Contexto Clínico</h3>
-    <p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Pendiente de confirmar desde la pestaña Petición]</p>
+    <p style="margin:0 0 16px 0;color:#6b7280;">[Pendiente de confirmar desde la pestaña Petición]</p>
 
     <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Técnicas Realizadas</h3>
-    <p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Pendiente]</p>
+    <p style="margin:0 0 16px 0;color:#6b7280;">[Pendiente]</p>
 
     <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Hallazgos</h3>
-    <p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Pendiente]</p>
+    <p style="margin:0 0 16px 0;color:#6b7280;">[Pendiente]</p>
 
     <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Conclusión</h3>
-    <p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Pendiente]</p>
+    <p style="margin:0 0 16px 0;color:#6b7280;">[Pendiente]</p>
 
     <h3 style="margin:0 0 8px 0;font-size:16px;font-weight:800;text-transform:uppercase;color:#1f2937;">Recomendación</h3>
-    <p style="margin:0;color:#6b7280;font-style:italic;">[Pendiente]</p>
+    <p style="margin:0;color:#6b7280;">[Pendiente]</p>
   </div>
 `;
 
@@ -501,8 +501,8 @@ ${processedClinicalContext || "CONTEXTO CLÍNICO:\n- Sin contexto clínico estru
 - Este bloque debe aparecer antes de la técnica, hallazgos y conclusión.
 
 ## COLORES (OBLIGATORIO en cada fragmento)
-- Patológico importante: <span style="color:#CC0000;font-style:italic;font-weight:bold;">texto</span>
-- Patológico leve: <span style="color:#D2691E;font-style:italic;">texto</span>
+- Patológico importante: <span style="color:#CC0000;font-weight:bold;">texto</span>
+- Patológico leve: <span style="color:#D2691E;">texto</span>
 - Normal VINCULADO a la patología del paciente: <span style="color:#2E8B57;">texto</span>
 - Normal relleno (no vinculado): <span style="color:${isDark ? '#aaa' : '#444'};">texto</span>
 
@@ -1577,7 +1577,7 @@ export default function Page() {
 
   const buildClinicalContextSectionHtml = (rawText = "") => {
     const text = String(rawText || "").trim();
-    if (!text) return '<p style="margin:0 0 16px 0;color:#6b7280;font-style:italic;">[Sin contexto clínico confirmado]</p>';
+    if (!text) return '<p style="margin:0 0 16px 0;color:#6b7280;">[Sin contexto clínico confirmado]</p>';
 
     const lines = text
       .split(/\r?\n+/)
@@ -2616,6 +2616,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                 <div style={{ fontSize: 12, marginBottom: 10, color: P.text3 }}>{report ? "Modo edición: modifica el contenido directamente manteniendo colores y formato." : "Plantilla editable lista: completa y da formato como en Word (negrita, subrayado, color y tamaño)."}</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                   <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("bold")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>B</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("italic")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: 12, fontStyle: "italic", cursor: "pointer" }}>I</button>
                   <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("underline")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: 12, fontWeight: 700, textDecoration: "underline", cursor: "pointer" }}>U</button>
                   <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("foreColor", "#1f2937")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: "#1f2937", fontSize: 12, cursor: "pointer" }}>A</button>
                   <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyReportFormat("foreColor", "#b91c1c")} style={{ padding: "5px 9px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: "transparent", color: "#b91c1c", fontSize: 12, cursor: "pointer" }}>A</button>
