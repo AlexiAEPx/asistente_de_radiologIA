@@ -2462,7 +2462,7 @@ ${instruction}`;
                         value={clinicalContextDraft}
                         onChange={(e) => setClinicalContextDraft(e.target.value)}
                         placeholder="Escribe o pega aquí el contexto clínico..."
-                        style={{ width: "100%", minHeight: 220, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
+                        style={{ width: "100%", minHeight: 72, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
                       />
                     </div>
                     <div style={{ padding: "14px 16px", background: P.recoPanelBg, border: "1px solid " + P.recoPanelBorder, borderRadius: 10 }}>
