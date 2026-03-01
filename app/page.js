@@ -2172,9 +2172,9 @@ ${instruction}`;
   const selectedModel = getModelByKey(model);
   const sm = selectedModel;
   const tabAccent = activeTabMeta.color;
-  const tabSurfaceBg = `linear-gradient(180deg, ${hexToRgba(tabAccent, isDark ? 0.14 : 0.1)} 0%, ${hexToRgba(tabAccent, isDark ? 0.06 : 0.04)} 42%, transparent 100%)`;
+  const tabSurfaceBg = hexToRgba(tabAccent, isDark ? 0.1 : 0.07);
   const tabSurfaceBorder = hexToRgba(tabAccent, isDark ? 0.35 : 0.3);
-  const linkedPanelBg = `linear-gradient(180deg, ${hexToRgba(tabAccent, isDark ? 0.2 : 0.16)} 0%, ${hexToRgba(tabAccent, isDark ? 0.1 : 0.08)} 60%, ${hexToRgba(tabAccent, isDark ? 0.08 : 0.06)} 100%)`;
+  const linkedPanelBg = hexToRgba(tabAccent, isDark ? 0.14 : 0.09);
   const linkedCardBg = isDark ? hexToRgba("#ffffff", 0.08) : hexToRgba("#ffffff", 0.78);
   const linkedHeaderBg = isDark ? hexToRgba(tabAccent, 0.26) : hexToRgba(tabAccent, 0.2);
   const S = {
