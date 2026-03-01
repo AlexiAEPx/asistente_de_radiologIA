@@ -142,6 +142,12 @@ const buildTabSignatures = ({ clinicalContextData, report, analysis, fMsgs, cMsg
   mindMap: JSON.stringify({ report, analysis, ctx: clinicalContextData.structuredText || "" }),
 });
 
+const TAB_UI_META = {
+  petition: { label: "Petición", color: "#22c55e" },
+  report: { label: "Informe", color: "#c4973c" },
+  analysis: { label: "Análisis", color: "#0ea5e9" },
+};
+
 const buildCtxBlock = (c) => {
   const p = [];
   if (c.freeText) p.push("Información clínica general (sin clasificar):\n" + c.freeText);
@@ -1146,6 +1152,7 @@ export default function Page() {
   const [reportSelectionPrompt, setReportSelectionPrompt] = useState("");
   const [reportSelectionText, setReportSelectionText] = useState("");
   const [ldReportSelectionAction, setLdReportSelectionAction] = useState(false);
+  const activeTabMeta = TAB_UI_META[rTab] || TAB_UI_META.petition;
   useEffect(() => {
     setClinicalContextDraft(clinicalContextData.structuredText || "");
     setClinicalRecommendations("");
@@ -1577,6 +1584,7 @@ export default function Page() {
 
   useEffect(() => {
     if (!reportEditorRef.current) return;
+    if (isEditingReport && document.activeElement === reportEditorRef.current) return;
     const nextHtml = editedReport || report || REPORT_TEMPLATE_HTML;
     if (reportEditorRef.current.innerHTML !== nextHtml) {
       reportEditorRef.current.innerHTML = nextHtml;
@@ -2337,6 +2345,10 @@ ${instruction}`;
 
       <div ref={mainRef} style={S.main}>
         <div style={S.lp}>
+          <div style={{ padding: "8px 12px", borderBottom: "1px solid " + P.goldBorder, fontSize: 11, color: P.text3, letterSpacing: 0.3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 8, background: P.bg2 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeTabMeta.color, boxShadow: `0 0 0 2px ${P.bg}` }} />
+            Chat vinculado a: <strong style={{ color: P.text, fontWeight: 700 }}>{activeTabMeta.label}</strong>
+          </div>
           {rTab === "petition" ? (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
               <div style={{ ...S.rh, background: P.chatHeader, borderColor: P.chatHeaderBorder }}><span style={{ ...S.rt, color: P.chatTitleColor }}>Chat de petición</span></div>
@@ -2402,7 +2414,7 @@ ${instruction}`;
           >{lpCollapsed ? "\u25B6" : "\u25C0"}</button>
         </div>
 
-        <div style={S.rp}>
+        <div style={{ ...S.rp, boxShadow: `inset 0 2px 0 ${activeTabMeta.color}` }}>
           <div
             data-tabbar=""
             style={{
