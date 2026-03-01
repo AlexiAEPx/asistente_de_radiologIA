@@ -56,3 +56,19 @@ test("normalizeQAResult validates followup enums", () => {
     ContractError
   );
 });
+
+test("normalizeClinicalRequest rejects unrealistic ages", () => {
+  assert.throws(
+    () =>
+      normalizeClinicalRequest({
+        patient: { age: 999, sex: "f" },
+        study: {
+          requested: "TC tórax",
+          modality: "tc",
+          reason: "disnea",
+          priority: "urgent",
+        },
+      }),
+    ContractError
+  );
+});
