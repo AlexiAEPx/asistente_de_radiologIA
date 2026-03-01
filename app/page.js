@@ -227,6 +227,26 @@ const splitFreeTextIntoItems = (text = "") => String(text || "")
   .map((line) => line.trim())
   .filter(Boolean);
 
+const CLINICAL_CONTEXT_PREFIX = "Contexto clínico:";
+const CLINICAL_CONTEXT_TEMPLATE = `${CLINICAL_CONTEXT_PREFIX}\n- `;
+
+const ensureClinicalContextFormat = (raw = "") => {
+  const text = String(raw || "").replace(/\r\n?/g, "\n").trim();
+  if (!text) return CLINICAL_CONTEXT_TEMPLATE;
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^contexto\s+cl[ií]nico\s*:?$/i.test(line))
+    .map((line) => line.replace(/^[-•*]\s*/, "").trim())
+    .filter(Boolean)
+    .map((line) => `- ${line}`);
+
+  if (!lines.length) return CLINICAL_CONTEXT_TEMPLATE;
+  return `${CLINICAL_CONTEXT_PREFIX}\n${lines.join("\n")}`;
+};
+
 const buildClinicalContextData = (c, fMsgs, cMsgs) => {
   const nonEmpty = (v) => (v || "").trim();
   const take = (arr) => (arr || []).map(e => nonEmpty(e.text)).filter(Boolean);
@@ -1169,7 +1189,7 @@ export default function Page() {
   const [ldReportSelectionAction, setLdReportSelectionAction] = useState(false);
   const activeTabMeta = TAB_UI_META[rTab] || TAB_UI_META.petition;
   useEffect(() => {
-    setClinicalContextDraft(clinicalContextData.structuredText || "");
+    setClinicalContextDraft(ensureClinicalContextFormat(clinicalContextData.structuredText || ""));
     setClinicalRecommendations("");
   }, [clinicalContextData.structuredText]);
 
@@ -1521,7 +1541,7 @@ export default function Page() {
     setShowPriorRadiology(!!snap.showPriorRadiology);
     setShowClinicalReports(!!snap.showClinicalReports);
     setShowTotum(!!snap.showTotum);
-    setClinicalContextDraft(snap.clinicalContextDraft || "");
+    setClinicalContextDraft(ensureClinicalContextFormat(snap.clinicalContextDraft || ""));
     setClinicalRecommendations(snap.clinicalRecommendations || "");
     setErr("");
     setShowHistory(false);
@@ -1932,7 +1952,7 @@ ${instruction}`;
         [{ role: "user", content: clinicalContextDraft }],
         700
       ));
-      setClinicalContextDraft(polished);
+      setClinicalContextDraft(ensureClinicalContextFormat(polished));
     } catch (e) {
       setErr("Error al procesar contexto clínico: " + e.message);
     }
@@ -2214,6 +2234,15 @@ ${instruction}`;
 
   return (
     <div style={S.root}>
+      <style>{`
+        .rpt-content { font-size: 13px; line-height: 1.55; }
+        .rpt-content h1:not(:first-child),
+        .rpt-content h2:not(:first-child),
+        .rpt-content h3:not(:first-child),
+        .rpt-content h4:not(:first-child),
+        .rpt-content h5:not(:first-child),
+        .rpt-content h6:not(:first-child) { margin-top: 1.35em !important; }
+      `}</style>
       {isMobile && <style>{`
         /* Hide scrollbar for mobile tab bars */
         div[data-tabbar] { -ms-overflow-style: none; scrollbar-width: none; }
@@ -2461,7 +2490,8 @@ ${instruction}`;
             <div style={{ ...S.rc, background: linkedPanelBg, fontSize: 13, lineHeight: 1.5 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
-                      <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                      <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>Contexto clínico</div>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button
                             onClick={() => syncClinicalContextIntoReport({ openReportTab: true })}
@@ -2489,12 +2519,12 @@ ${instruction}`;
                       </div>
                       <textarea
                         value={clinicalContextDraft}
-                        onChange={(e) => setClinicalContextDraft(e.target.value)}
+                        onChange={(e) => setClinicalContextDraft(ensureClinicalContextFormat(e.target.value))}
                         placeholder="Escribe o pega aquí el contexto clínico..."
                         style={{ width: "100%", minHeight: 72, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
                       />
                     </div>
-                    <div style={{ padding: "14px 16px", background: P.recoPanelBg, border: "1px solid " + P.recoPanelBorder, borderRadius: 10 }}>
+                    <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
                       <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>Recomendaciones para este caso</div>
                         <button
@@ -2506,7 +2536,7 @@ ${instruction}`;
                           {ldClinicalRecommendations ? "⏳" : "🤖"}
                         </button>
                       </div>
-                      <div style={{ whiteSpace: "pre-wrap", color: P.text }}>
+                      <div style={{ whiteSpace: "pre-wrap", color: P.text, textAlign: "left" }}>
                         {clinicalRecommendations
                           ? clinicalRecommendations
                           : <span style={{ color: P.text3, opacity: 0.78, textShadow: "0 1px 0 rgba(0,0,0,0.08)" }}>Pulsa 🤖 para ver un listado breve de hallazgos clave a buscar según este contexto clínico.</span>}
@@ -2654,7 +2684,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
                     </button>
                   </div>
                 </div>}
-              </div> : <div ref={reportViewRef} dangerouslySetInnerHTML={{ __html: report }} />}</div>
+              </div> : <div ref={reportViewRef} className="rpt-content" dangerouslySetInnerHTML={{ __html: report }} />}</div>
             {report && <div style={S.lg}>{[["#CC0000", "Grave"], ["#D2691E", "Leve"], ["#2E8B57", "Normal vinculado"], [isDark ? "#aaa" : "#444", "Relleno"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
           </div>}
 
@@ -2712,9 +2742,9 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
               {diffDiag && <div style={{ ...S.lg, borderColor: P.diffDiagHeaderBorder }}>{[["#dc2626", "Más probable"], ["#ea580c", "Probable"], ["#ca8a04", "Menos probable"], ["#16a34a", "Descartado"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
             </div>
 
-            <div style={{ border: "1px solid " + P.mindMapHeaderBorder, borderRadius: 12, overflow: "hidden", minHeight: isMindMapEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
-              <div style={{ ...S.rh, background: P.mindMapHeader, borderColor: P.mindMapHeaderBorder }}><span style={{ ...S.rt, color: P.mindMapTitleColor }}>Mapa Mental</span></div>
-              <div style={{ ...S.rc, background: P.mindMapBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isMindMapEmpty ? "0 0 auto" : 1, padding: isMindMapEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
+            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isMindMapEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+              <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Mapa Mental</span></div>
+              <div style={{ ...S.rc, background: linkedCardBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isMindMapEmpty ? "0 0 auto" : 1, padding: isMindMapEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
                 <div style={{ flex: 1 }}>
                   {ldMindMap ? <div style={S.ph}><LoadingDots text="Generando mapa mental..." /></div> : mindMap ? <div dangerouslySetInnerHTML={{ __html: mindMap }} /> : <div style={{ fontSize: 13, color: P.text3, opacity: 0.78 }}>Pulsa 🤖 para generar mapa mental.</div>}
                 </div>
