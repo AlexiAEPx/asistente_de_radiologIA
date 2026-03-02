@@ -2243,11 +2243,13 @@ ${instruction}`;
     hdr: { display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: isMobile ? "8px 12px" : "8px 14px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: isMobile ? 6 : 8, flexWrap: "wrap" },
     logo: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: isMobile ? 17 : 20, fontWeight: 700, color: P.gold, letterSpacing: 0.5 },
     sub: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: isMobile ? 8 : 10, color: P.goldDim, letterSpacing: isMobile ? 2 : 3, textTransform: "uppercase", marginTop: 1 },
-    hdrR: { display: "flex", alignItems: "center", gap: isMobile ? 5 : 8, flexWrap: "wrap" },
-    topCtrl: { display: "flex", flexDirection: "column", gap: 3, minWidth: isMobile ? "100%" : 180 },
+    hdrR: { display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-start", gap: isMobile ? 6 : 7, marginLeft: "auto", minWidth: 0 },
+    hdrIcons: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: isMobile ? 4 : 6, flexWrap: "wrap", width: "100%" },
+    hdrConfig: { display: "flex", alignItems: "flex-start", justifyContent: "flex-end", gap: isMobile ? 5 : 8, flexWrap: "wrap", width: "100%" },
+    topCtrl: { display: "flex", flexDirection: "column", gap: 3, minWidth: isMobile ? "100%" : 170 },
     topCtrlLb: { fontSize: 10, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: P.text3 },
     topSel: { width: "100%", padding: isMobile ? "6px 9px" : "5px 8px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.inputBg, color: P.text, fontSize: 11, fontFamily: "inherit" },
-    topModules: { display: "flex", flexDirection: "column", gap: 3, minWidth: isMobile ? "100%" : 220 },
+    topModules: { display: "flex", flexDirection: "column", gap: 3, minWidth: isMobile ? "100%" : 210 },
     topTabs: { display: "flex", gap: 4, padding: 3, borderRadius: 10, border: "1px solid " + P.tabShellBorder, background: P.tabShellBg, overflowX: "auto" },
     mBtn: { display: "flex", alignItems: "center", gap: 5, padding: isMobile ? "4px 8px" : "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: isMobile ? 11 : 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", position: "relative" },
     mDrop: { position: "absolute", top: "calc(100% + 4px)", right: 0, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 10, padding: 5, zIndex: 100, minWidth: 170, boxShadow: P.dropdownShadow },
@@ -2325,68 +2327,20 @@ ${instruction}`;
       <div style={S.hdr}>
         <div><div style={S.logo}>asistente_de_radiolog<span style={{ color: isDark ? "#e8c547" : "#b8860b", textShadow: isDark ? "0 0 8px rgba(232,197,71,0.4)" : "none" }}>IA</span> <span aria-hidden="true" style={{ fontSize: isMobile ? 15 : 18 }}>🤖</span></div><div style={S.sub}>Estación de trabajo <span style={{ letterSpacing: 1, opacity: 0.7 }}>·</span> <span style={{ fontStyle: "italic", letterSpacing: 1, fontSize: 9, opacity: 0.6 }}>by Alexis Espinosa</span></div></div>
         <div style={S.hdrR}>
-          <div style={S.topCtrl}>
-            <span style={S.topCtrlLb}>Seleccionar perfil</span>
-            <select value={ctx.radiologistProfile || "general"} onChange={(e) => setCtx(prev => ({ ...prev, radiologistProfile: e.target.value }))} style={S.topSel}>
-              {RADIOLOGIST_PROFILES.map((profile) => <option key={profile.value} value={profile.value}>{profile.label}</option>)}
-            </select>
-          </div>
-          <div style={S.topModules}>
-            <span style={S.topCtrlLb}>Seleccionar módulo</span>
-            <div data-tabbar="" style={S.topTabs}>
-              {rightTabsConfig.map(t => (
-                <Tab
-                  key={t.key}
-                  active={rTab === t.key}
-                  icon={t.icon}
-                  label={t.label}
-                  status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
-                  stale={!!staleTabs[t.key]}
-                  onClick={() => openRightTab(t.key)}
-                  onRun={t.run}
-                  canRun={t.canRun}
-                  isRunning={t.loading}
-                  P={P}
-                  compact={isMobile}
-                  accentColor={t.color}
-                />
-              ))}
+          <div style={S.hdrIcons}>
+            <ThemeToggle themePref={themePref} setThemePref={setThemePref} P={P} />
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setShowMP(!showMP)} style={S.mBtn}>{sm?.cost} {sm?.label} ▾</button>
+              {showMP && <div style={S.mDrop}>{MODELS.map(m => (
+                <div key={m.id} style={S.mOpt(m.key === model)} onClick={() => { setModel(m.key); setShowMP(false); }}><span>{m.cost} {m.label}</span><span style={{ fontSize: 11, opacity: 0.6 }}>{m.desc}</span></div>
+              ))}</div>}
             </div>
-          </div>
-          {spending.calls > 0 && <div style={{
-            display: isMobile ? "none" : "flex", alignItems: "center", gap: 8, padding: "4px 12px",
-            borderRadius: 8, border: "1px dashed " + P.goldBorder,
-            background: isDark ? "rgba(196,151,60,0.06)" : "rgba(150,114,42,0.04)",
-            fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 11, color: P.text2,
-          }}>
-            <span style={{ fontSize: 14 }}>🧾</span>
-            <span style={{ fontWeight: 700, color: spending.totalCost >= 0.10 ? "#e67e22" : P.gold, fontSize: 13 }}>
-              {spending.totalCost < 0.01
-                ? (spending.totalCost * 1000).toFixed(2) + " milésimas $"
-                : spending.totalCost < 1
-                  ? (spending.totalCost * 100).toFixed(2) + "¢"
-                  : "$" + spending.totalCost.toFixed(2)}
-            </span>
-            <span style={{ color: P.text4 }}>|</span>
-            <span title={`${spending.inputTokens.toLocaleString()} entrada + ${spending.outputTokens.toLocaleString()} salida`}>
-              {((spending.inputTokens + spending.outputTokens) / 1000).toFixed(1)}k tok
-            </span>
-            <span style={{ color: P.text4 }}>|</span>
-            <span>{spending.calls} {spending.calls === 1 ? "llamada" : "llamadas"}</span>
-          </div>}
-          <ThemeToggle themePref={themePref} setThemePref={setThemePref} P={P} />
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setShowMP(!showMP)} style={S.mBtn}>{sm?.cost} {sm?.label} ▾</button>
-            {showMP && <div style={S.mDrop}>{MODELS.map(m => (
-              <div key={m.id} style={S.mOpt(m.key === model)} onClick={() => { setModel(m.key); setShowMP(false); }}><span>{m.cost} {m.label}</span><span style={{ fontSize: 11, opacity: 0.6 }}>{m.desc}</span></div>
-            ))}</div>}
-          </div>
-          <div style={{ position: "relative" }}>
-            <button onClick={() => { setShowHistory(!showHistory); setShowExport(false); }} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
-              <span>Historial</span>
-              {history.length > 0 && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, borderRadius: 9, background: P.gold, color: isDark ? "#111" : "#fff", fontSize: 10, fontWeight: 700, padding: "0 4px" }}>{history.length}</span>}
-            </button>
-            {showHistory && <>
+            <div style={{ position: "relative" }}>
+              <button onClick={() => { setShowHistory(!showHistory); setShowExport(false); }} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
+                <span>Historial</span>
+                {history.length > 0 && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, borderRadius: 9, background: P.gold, color: isDark ? "#111" : "#fff", fontSize: 10, fontWeight: 700, padding: "0 4px" }}>{history.length}</span>}
+              </button>
+              {showHistory && <>
               <div onClick={() => setShowHistory(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
               <div style={{ position: isMobile ? "fixed" : "absolute", top: isMobile ? "auto" : "calc(100% + 6px)", bottom: isMobile ? 0 : "auto", left: isMobile ? 0 : "auto", right: isMobile ? 0 : 0, width: isMobile ? "100%" : 370, maxHeight: isMobile ? "60vh" : "70vh", background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: isMobile ? "12px 12px 0 0" : 12, boxShadow: P.dropdownShadow, zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid " + P.historyHeaderBorder, background: P.historyHeader }}>
@@ -2437,21 +2391,73 @@ ${instruction}`;
               </div>
             </>}
           </div>
-          <div style={{ position: "relative" }}>
-            <button onClick={() => { setCloseAfterExport(false); setShowExport(!showExport); setShowHistory(false); }} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
-              <span>Exportar</span>
-              <span style={{ fontSize: 10 }}>▾</span>
-            </button>
-            {showExport && <>
-              <div onClick={() => setShowExport(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
-              <div style={{ position: isMobile ? "fixed" : "absolute", top: isMobile ? "auto" : "calc(100% + 6px)", bottom: isMobile ? 0 : "auto", left: isMobile ? 0 : "auto", right: isMobile ? 0 : 0, width: isMobile ? "100%" : 250, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: isMobile ? "12px 12px 0 0" : 12, boxShadow: P.dropdownShadow, zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                <button onClick={exportCaseAsMarkdown} style={{ padding: "11px 14px", textAlign: "left", border: "none", background: "transparent", color: P.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>⬇️ Exportar Markdown</button>
-                <button onClick={exportCaseAsPdf} style={{ padding: "11px 14px", textAlign: "left", border: "none", borderTop: "1px solid " + P.goldBorder, background: "transparent", color: P.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>⬇️ Exportar PDF</button>
-              </div>
-            </>}
+            <div style={{ position: "relative" }}>
+              <button onClick={() => { setCloseAfterExport(false); setShowExport(!showExport); setShowHistory(false); }} style={{ ...S.clr, display: "flex", alignItems: "center", gap: 5 }}>
+                <span>Exportar</span>
+                <span style={{ fontSize: 10 }}>▾</span>
+              </button>
+              {showExport && <>
+                <div onClick={() => setShowExport(false)} style={{ position: "fixed", inset: 0, zIndex: 199 }} />
+                <div style={{ position: isMobile ? "fixed" : "absolute", top: isMobile ? "auto" : "calc(100% + 6px)", bottom: isMobile ? 0 : "auto", left: isMobile ? 0 : "auto", right: isMobile ? 0 : 0, width: isMobile ? "100%" : 250, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: isMobile ? "12px 12px 0 0" : 12, boxShadow: P.dropdownShadow, zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  <button onClick={exportCaseAsMarkdown} style={{ padding: "11px 14px", textAlign: "left", border: "none", background: "transparent", color: P.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>⬇️ Exportar Markdown</button>
+                  <button onClick={exportCaseAsPdf} style={{ padding: "11px 14px", textAlign: "left", border: "none", borderTop: "1px solid " + P.goldBorder, background: "transparent", color: P.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>⬇️ Exportar PDF</button>
+                </div>
+              </>}
+            </div>
+            <button onClick={closeCase} style={S.clr}>Cerrar caso</button>
+            <button onClick={clearAll} style={S.clr}>Nueva sesión</button>
           </div>
-          <button onClick={closeCase} style={S.clr}>Cerrar caso</button>
-          <button onClick={clearAll} style={S.clr}>Nueva sesión</button>
+          <div style={S.hdrConfig}>
+            <div style={S.topCtrl}>
+              <span style={S.topCtrlLb}>Seleccionar perfil</span>
+              <select value={ctx.radiologistProfile || "general"} onChange={(e) => setCtx(prev => ({ ...prev, radiologistProfile: e.target.value }))} style={S.topSel}>
+                {RADIOLOGIST_PROFILES.map((profile) => <option key={profile.value} value={profile.value}>{profile.label}</option>)}
+              </select>
+            </div>
+            <div style={S.topModules}>
+              <span style={S.topCtrlLb}>Seleccionar módulo</span>
+              <div data-tabbar="" style={S.topTabs}>
+                {rightTabsConfig.map(t => (
+                  <Tab
+                    key={t.key}
+                    active={rTab === t.key}
+                    icon={t.icon}
+                    label={t.label}
+                    status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
+                    stale={!!staleTabs[t.key]}
+                    onClick={() => openRightTab(t.key)}
+                    onRun={t.run}
+                    canRun={t.canRun}
+                    isRunning={t.loading}
+                    P={P}
+                    compact={isMobile}
+                    accentColor={t.color}
+                  />
+                ))}
+              </div>
+            </div>
+            {spending.calls > 0 && <div style={{
+              display: isMobile ? "none" : "flex", alignItems: "center", gap: 8, padding: "4px 12px",
+              borderRadius: 8, border: "1px dashed " + P.goldBorder,
+              background: isDark ? "rgba(196,151,60,0.06)" : "rgba(150,114,42,0.04)",
+              fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 11, color: P.text2,
+            }}>
+              <span style={{ fontSize: 14 }}>🧾</span>
+              <span style={{ fontWeight: 700, color: spending.totalCost >= 0.10 ? "#e67e22" : P.gold, fontSize: 13 }}>
+                {spending.totalCost < 0.01
+                  ? (spending.totalCost * 1000).toFixed(2) + " milésimas $"
+                  : spending.totalCost < 1
+                    ? (spending.totalCost * 100).toFixed(2) + "¢"
+                    : "$" + spending.totalCost.toFixed(2)}
+              </span>
+              <span style={{ color: P.text4 }}>|</span>
+              <span title={`${spending.inputTokens.toLocaleString()} entrada + ${spending.outputTokens.toLocaleString()} salida`}>
+                {((spending.inputTokens + spending.outputTokens) / 1000).toFixed(1)}k tok
+              </span>
+              <span style={{ color: P.text4 }}>|</span>
+              <span>{spending.calls} {spending.calls === 1 ? "llamada" : "llamadas"}</span>
+            </div>}
+          </div>
         </div>
       </div>
 
