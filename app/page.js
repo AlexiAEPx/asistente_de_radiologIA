@@ -2589,7 +2589,7 @@ ${instruction}`;
                           const numeric = e.target.value.replace(/\D/g, "").slice(0, 4);
                           setCtx(prev => ({ ...prev, birthDate: numeric }));
                         }}
-                        placeholder="Año"
+                        placeholder="Año de nacimiento"
                         style={{ ...S.inp(false), width: isMobile ? "100%" : 96 }}
                       />
                       <select value={ctx.gender} onChange={(e) => setCtx(prev => ({ ...prev, gender: e.target.value }))} style={{ ...S.sel, width: isMobile ? "100%" : 120 }}><option value="">Género</option><option value="mujer">Mujer</option><option value="hombre">Hombre</option><option value="otro">Otro</option></select>
