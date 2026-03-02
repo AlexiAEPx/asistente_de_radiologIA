@@ -149,6 +149,16 @@ const TAB_UI_META = {
   analysis: { label: "Análisis", color: "#0ea5e9" },
 };
 
+const RADIOLOGIST_PROFILES = [
+  { value: "general", label: "Perfil radiológico general" },
+  { value: "mama", label: "Perfil radiológico de mama" },
+  { value: "radiologo_mama", label: "Radiólogo de mama" },
+  { value: "neuro", label: "Radiólogo de neuro" },
+  { value: "urgencias", label: "Radiólogo de urgencias" },
+  { value: "musculoesqueletico", label: "Radiólogo musculoesquelético" },
+  { value: "estudiante_mama", label: "Estudiante radiología de mama" },
+];
+
 const hexToRgba = (hex, alpha = 1) => {
   const clean = String(hex || "").replace("#", "").trim();
   if (clean.length !== 6) return `rgba(196,151,60,${alpha})`;
@@ -2221,6 +2231,11 @@ ${instruction}`;
     logo: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: isMobile ? 17 : 20, fontWeight: 700, color: P.gold, letterSpacing: 0.5 },
     sub: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: isMobile ? 8 : 10, color: P.goldDim, letterSpacing: isMobile ? 2 : 3, textTransform: "uppercase", marginTop: 1 },
     hdrR: { display: "flex", alignItems: "center", gap: isMobile ? 5 : 8, flexWrap: "wrap" },
+    topCtrl: { display: "flex", flexDirection: "column", gap: 4, minWidth: isMobile ? "100%" : 220 },
+    topCtrlLb: { fontSize: 10, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: P.text3 },
+    topSel: { width: "100%", padding: isMobile ? "6px 9px" : "7px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.inputBg, color: P.text, fontSize: 12, fontFamily: "inherit" },
+    topModules: { display: "flex", flexDirection: "column", gap: 4, minWidth: isMobile ? "100%" : 250 },
+    topTabs: { display: "flex", gap: 6, padding: 4, borderRadius: 10, border: "1px solid " + P.tabShellBorder, background: P.tabShellBg, overflowX: "auto" },
     mBtn: { display: "flex", alignItems: "center", gap: 5, padding: isMobile ? "4px 8px" : "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: isMobile ? 11 : 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", position: "relative" },
     mDrop: { position: "absolute", top: "calc(100% + 4px)", right: 0, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 10, padding: 5, zIndex: 100, minWidth: 170, boxShadow: P.dropdownShadow },
     mOpt: (a) => ({ display: "flex", justifyContent: "space-between", padding: "7px 10px", borderRadius: 6, cursor: "pointer", background: a ? P.goldBgActive : "transparent", color: a ? P.gold : P.text2, fontSize: 13, fontWeight: a ? 600 : 400 }),
@@ -2297,6 +2312,34 @@ ${instruction}`;
       <div style={S.hdr}>
         <div><div style={S.logo}>asistente_de_radiolog<span style={{ color: isDark ? "#e8c547" : "#b8860b", textShadow: isDark ? "0 0 8px rgba(232,197,71,0.4)" : "none" }}>IA</span> <span aria-hidden="true" style={{ fontSize: isMobile ? 15 : 18 }}>🤖</span></div><div style={S.sub}>Estación de trabajo <span style={{ letterSpacing: 1, opacity: 0.7 }}>·</span> <span style={{ fontStyle: "italic", letterSpacing: 1, fontSize: 9, opacity: 0.6 }}>by Alexis Espinosa</span></div></div>
         <div style={S.hdrR}>
+          <div style={S.topCtrl}>
+            <span style={S.topCtrlLb}>Seleccionar perfil</span>
+            <select value={ctx.radiologistProfile || "general"} onChange={(e) => setCtx(prev => ({ ...prev, radiologistProfile: e.target.value }))} style={S.topSel}>
+              {RADIOLOGIST_PROFILES.map((profile) => <option key={profile.value} value={profile.value}>{profile.label}</option>)}
+            </select>
+          </div>
+          <div style={S.topModules}>
+            <span style={S.topCtrlLb}>Seleccionar módulo</span>
+            <div data-tabbar="" style={S.topTabs}>
+              {rightTabsConfig.map(t => (
+                <Tab
+                  key={t.key}
+                  active={rTab === t.key}
+                  icon={t.icon}
+                  label={t.label}
+                  status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
+                  stale={!!staleTabs[t.key]}
+                  onClick={() => openRightTab(t.key)}
+                  onRun={t.run}
+                  canRun={t.canRun}
+                  isRunning={t.loading}
+                  P={P}
+                  compact={isMobile}
+                  accentColor={t.color}
+                />
+              ))}
+            </div>
+          </div>
           {spending.calls > 0 && <div style={{
             display: isMobile ? "none" : "flex", alignItems: "center", gap: 8, padding: "4px 12px",
             borderRadius: 8, border: "1px dashed " + P.goldBorder,
@@ -2436,31 +2479,6 @@ ${instruction}`;
 
       <div ref={mainRef} style={S.main}>
         <div style={{ ...S.lp, borderRight: isMobile ? "none" : "1px solid " + tabSurfaceBorder, background: tabSurfaceBg }}>
-          <div
-            data-tabbar=""
-            style={{
-              ...S.tb,
-              borderBottom: "1px solid " + tabSurfaceBorder,
-            }}
-          >
-            {rightTabsConfig.map(t => (
-              <Tab
-                key={t.key}
-                active={rTab === t.key}
-                icon={t.icon}
-                label={t.label}
-                status={tabStatus[t.key] === "unread" ? "unread" : tabStatus[t.key] === "read" ? "read" : null}
-                stale={!!staleTabs[t.key]}
-                onClick={() => openRightTab(t.key)}
-                onRun={t.run}
-                canRun={t.canRun}
-                isRunning={t.loading}
-                P={P}
-                compact={isMobile}
-                accentColor={t.color}
-              />
-            ))}
-          </div>
           {rTab === "petition" ? (
             <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
               <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Chat de petición</span></div>
@@ -2537,12 +2555,6 @@ ${instruction}`;
                       <input type="number" min="1900" max="2100" inputMode="numeric" value={ctx.birthDate} onChange={(e) => setCtx(prev => ({ ...prev, birthDate: e.target.value.slice(0, 4) }))} placeholder="Año de nacimiento" style={S.inp(false)} />
                       <select value={ctx.gender} onChange={(e) => setCtx(prev => ({ ...prev, gender: e.target.value }))} style={S.sel}><option value="">Género</option><option value="mujer">Mujer</option><option value="hombre">Hombre</option><option value="otro">Otro</option></select>
                       <select value={ctx.studyRequested} onChange={(e) => setCtx(prev => ({ ...prev, studyRequested: e.target.value }))} style={S.sel}><option value="">Tipo de exploración</option><option value="TC">TC</option><option value="RM">RM</option><option value="RX">RX</option><option value="Ecografía">Ecografía</option><option value="PET-TC">PET-TC</option><option value="AngioTC">AngioTC</option></select>
-                      <select value={ctx.radiologistProfile || "general"} onChange={(e) => setCtx(prev => ({ ...prev, radiologistProfile: e.target.value }))} style={{ ...S.sel, gridColumn: isMobile ? "auto" : "1 / -1" }}>
-                        <option value="general">Perfil radiológico general</option>
-                        <option value="estudiante_mama">Estudiante radiología de mama</option>
-                        <option value="urgencias">Radiólogo de urgencias</option>
-                        <option value="musculoesqueletico">Radiólogo musculoesquelético</option>
-                      </select>
                     </div>
                   </div>
                     <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
