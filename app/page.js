@@ -150,14 +150,24 @@ const TAB_UI_META = {
 };
 
 const RADIOLOGIST_PROFILES = [
-  { value: "general", label: "Perfil radiológico general" },
-  { value: "mama", label: "Perfil radiológico de mama" },
-  { value: "radiologo_mama", label: "Radiólogo de mama" },
-  { value: "neuro", label: "Radiólogo de neuro" },
-  { value: "urgencias", label: "Radiólogo de urgencias" },
-  { value: "musculoesqueletico", label: "Radiólogo musculoesquelético" },
-  { value: "estudiante_mama", label: "Estudiante radiología de mama" },
+  { value: "general", label: "General" },
+  { value: "mama", label: "Mama" },
+  { value: "neurourgencias", label: "Neurourgencias" },
+  { value: "musculoesqueletico", label: "Músculo-quelético" },
+  { value: "toracico", label: "Torácico" },
+  { value: "oncologico", label: "Oncológico" },
 ];
+
+const RADIOLOGIST_PROFILE_PROMPTS = {
+  general: "Perfil general: prioriza informes estructurados, claridad diagnóstica, síntesis clínica y recomendaciones accionables sin sesgo de subespecialidad.",
+  mama: "Perfil mama: enfatiza terminología y patrones de imagen mamaria, prioriza sospecha oncológica, BI-RADS cuando aplique y correlación con cribado/seguimiento.",
+  neurourgencias: "Perfil neurourgencias: prioriza hallazgos tiempo-dependientes, signos de ictus/hemorragia/efecto masa, mensajes de urgencia y recomendaciones inmediatas de manejo.",
+  musculoesqueletico: "Perfil músculo-quelético: enfatiza lesiones osteoarticulares y de partes blandas, estabilidad, afectación tendinosa/ligamentaria y correlación funcional.",
+  toracico: "Perfil torácico: prioriza hallazgos pulmonares, pleurales y mediastínicos clínicamente relevantes, severidad respiratoria y complicaciones agudas.",
+  oncologico: "Perfil oncológico: prioriza estadiaje, respuesta terapéutica, carga tumoral, diseminación, criterios comparativos y recomendaciones de seguimiento.",
+};
+
+const getRadiologistProfilePrompt = (profile) => RADIOLOGIST_PROFILE_PROMPTS[profile] || RADIOLOGIST_PROFILE_PROMPTS.general;
 
 const hexToRgba = (hex, alpha = 1) => {
   const clean = String(hex || "").replace("#", "").trim();
@@ -529,6 +539,9 @@ Formato de salida obligatorio:
 
 const REPORT_SYS = (c, isDark, processedClinicalContext = "") => `Eres "Asistente de Radiología", asistente de informes radiológicos profesionales en español.
 ${buildCtxBlock(c)}
+
+## PERFIL RADIOLÓGICO ACTIVO (OBLIGATORIO)
+- ${getRadiologistProfilePrompt(c.radiologistProfile)}
 
 ## CONTEXTO CLÍNICO (OBLIGATORIO EN LA SALIDA)
 - Al INICIO absoluto del informe, añade una sección HTML con título exacto "CONTEXTO CLÍNICO".
@@ -2227,15 +2240,15 @@ ${instruction}`;
   const linkedHeaderBg = isDark ? hexToRgba(tabAccent, 0.26) : hexToRgba(tabAccent, 0.2);
   const S = {
     root: { display: "flex", flexDirection: "column", height: isMobile ? "auto" : "100vh", minHeight: isMobile ? "100vh" : undefined, width: "100%", background: P.bg, color: P.text, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif", overflow: isMobile ? "auto" : "hidden", transition: "background 0.3s, color 0.3s" },
-    hdr: { display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: isMobile ? "8px 12px" : "10px 18px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: isMobile ? 6 : 10, flexWrap: "wrap" },
+    hdr: { display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: isMobile ? "8px 12px" : "8px 14px", borderBottom: "1px solid " + P.goldBorder, background: isDark ? "linear-gradient(135deg,#12121e,#1a1a2e)" : "linear-gradient(135deg,#f8f6f1,#f0ece2)", flexShrink: 0, gap: isMobile ? 6 : 8, flexWrap: "wrap" },
     logo: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: isMobile ? 17 : 20, fontWeight: 700, color: P.gold, letterSpacing: 0.5 },
     sub: { fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: isMobile ? 8 : 10, color: P.goldDim, letterSpacing: isMobile ? 2 : 3, textTransform: "uppercase", marginTop: 1 },
     hdrR: { display: "flex", alignItems: "center", gap: isMobile ? 5 : 8, flexWrap: "wrap" },
-    topCtrl: { display: "flex", flexDirection: "column", gap: 4, minWidth: isMobile ? "100%" : 220 },
+    topCtrl: { display: "flex", flexDirection: "column", gap: 3, minWidth: isMobile ? "100%" : 180 },
     topCtrlLb: { fontSize: 10, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: P.text3 },
-    topSel: { width: "100%", padding: isMobile ? "6px 9px" : "7px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.inputBg, color: P.text, fontSize: 12, fontFamily: "inherit" },
-    topModules: { display: "flex", flexDirection: "column", gap: 4, minWidth: isMobile ? "100%" : 250 },
-    topTabs: { display: "flex", gap: 6, padding: 4, borderRadius: 10, border: "1px solid " + P.tabShellBorder, background: P.tabShellBg, overflowX: "auto" },
+    topSel: { width: "100%", padding: isMobile ? "6px 9px" : "5px 8px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.inputBg, color: P.text, fontSize: 11, fontFamily: "inherit" },
+    topModules: { display: "flex", flexDirection: "column", gap: 3, minWidth: isMobile ? "100%" : 220 },
+    topTabs: { display: "flex", gap: 4, padding: 3, borderRadius: 10, border: "1px solid " + P.tabShellBorder, background: P.tabShellBg, overflowX: "auto" },
     mBtn: { display: "flex", alignItems: "center", gap: 5, padding: isMobile ? "4px 8px" : "5px 10px", borderRadius: 7, border: "1px solid " + P.goldBorder, background: P.goldBg, color: P.gold, fontSize: isMobile ? 11 : 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", position: "relative" },
     mDrop: { position: "absolute", top: "calc(100% + 4px)", right: 0, background: P.dropdownBg, border: "1px solid " + P.goldBorder, borderRadius: 10, padding: 5, zIndex: 100, minWidth: 170, boxShadow: P.dropdownShadow },
     mOpt: (a) => ({ display: "flex", justifyContent: "space-between", padding: "7px 10px", borderRadius: 6, cursor: "pointer", background: a ? P.goldBgActive : "transparent", color: a ? P.gold : P.text2, fontSize: 13, fontWeight: a ? 600 : 400 }),
@@ -2550,11 +2563,37 @@ ${instruction}`;
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
                     <div style={{ marginBottom: 10, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>Opciones de petición</div>
-                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-                      <input type="number" min="0" max="120" value={ctx.age} onChange={(e) => setCtx(prev => ({ ...prev, age: e.target.value }))} placeholder="Edad" style={S.inp(false)} />
-                      <input type="number" min="1900" max="2100" inputMode="numeric" value={ctx.birthDate} onChange={(e) => setCtx(prev => ({ ...prev, birthDate: e.target.value.slice(0, 4) }))} placeholder="Año de nacimiento" style={S.inp(false)} />
-                      <select value={ctx.gender} onChange={(e) => setCtx(prev => ({ ...prev, gender: e.target.value }))} style={S.sel}><option value="">Género</option><option value="mujer">Mujer</option><option value="hombre">Hombre</option><option value="otro">Otro</option></select>
-                      <select value={ctx.studyRequested} onChange={(e) => setCtx(prev => ({ ...prev, studyRequested: e.target.value }))} style={S.sel}><option value="">Tipo de exploración</option><option value="TC">TC</option><option value="RM">RM</option><option value="RX">RX</option><option value="Ecografía">Ecografía</option><option value="PET-TC">PET-TC</option><option value="AngioTC">AngioTC</option></select>
+                    <div style={{ display: "flex", flexWrap: isMobile ? "wrap" : "nowrap", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={ctx.age}
+                        onChange={(e) => {
+                          const numeric = e.target.value.replace(/\D/g, "").slice(0, 2);
+                          setCtx(prev => ({ ...prev, age: numeric }));
+                        }}
+                        placeholder="Edad"
+                        style={{ ...S.inp(false), width: isMobile ? "100%" : 82 }}
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={ctx.birthDate}
+                        onChange={(e) => {
+                          const numeric = e.target.value.replace(/\D/g, "").slice(0, 4);
+                          setCtx(prev => ({ ...prev, birthDate: numeric }));
+                        }}
+                        placeholder="Año"
+                        style={{ ...S.inp(false), width: isMobile ? "100%" : 96 }}
+                      />
+                      <select value={ctx.gender} onChange={(e) => setCtx(prev => ({ ...prev, gender: e.target.value }))} style={{ ...S.sel, width: isMobile ? "100%" : 120 }}><option value="">Género</option><option value="mujer">Mujer</option><option value="hombre">Hombre</option><option value="otro">Otro</option></select>
+                      <input
+                        type="text"
+                        value={ctx.studyRequested}
+                        onChange={(e) => setCtx(prev => ({ ...prev, studyRequested: e.target.value }))}
+                        placeholder="Tipo de exploración (tags)"
+                        style={{ ...S.inp(false), flex: 1, minWidth: isMobile ? "100%" : 220 }}
+                      />
                     </div>
                   </div>
                     <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
