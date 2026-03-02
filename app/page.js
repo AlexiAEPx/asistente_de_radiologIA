@@ -94,7 +94,7 @@ const normalizeEntry = (entry = {}) => ({
 
 const normalizeCtx = (ctx = {}) => ({
   age: ctx.age || "",
-  birthYear: ctx.birthYear || "",
+  birthDate: ctx.birthDate || "",
   gender: ctx.gender || "",
   studyRequested: ctx.studyRequested || "",
   priority: ctx.priority || "programado",
@@ -105,6 +105,7 @@ const normalizeCtx = (ctx = {}) => ({
   clinicalReports: (ctx.clinicalReports || [newEntry()]).map(normalizeEntry),
   freeText: ctx.freeText || "",
   freeTextImages: Array.isArray(ctx.freeTextImages) ? ctx.freeTextImages : [],
+  radiologistProfile: ctx.radiologistProfile || "general",
 });
 
 const getEntryImageNote = (entry) => {
@@ -163,8 +164,10 @@ const buildCtxBlock = (c) => {
   const p = [];
   if (c.freeText) p.push("Información clínica general (sin clasificar):\n" + c.freeText);
   if (c.age) p.push("Edad: " + c.age + " años");
+  if (c.birthDate) p.push("Fecha de nacimiento: " + c.birthDate);
   if (c.gender) p.push("Género: " + c.gender);
   if (c.studyRequested) p.push("Estudio solicitado: " + c.studyRequested);
+  if (c.radiologistProfile && c.radiologistProfile !== "general") p.push("Perfil radiológico activo: " + c.radiologistProfile);
   const priorityLabel = getPriorityLabel(c.priority);
   if (priorityLabel) p.push("Prioridad: " + priorityLabel);
   if (c.reason) p.push("Motivo: " + c.reason);
@@ -243,6 +246,12 @@ const splitFreeTextIntoItems = (text = "") => String(text || "")
 
 const CLINICAL_CONTEXT_PREFIX = "CONTEXTO CLÍNICO:";
 const CLINICAL_CONTEXT_TEMPLATE = `${CLINICAL_CONTEXT_PREFIX}\n- `;
+const ensureLineEndsWithPeriod = (line = "") => {
+  const clean = String(line || "").trim().replace(/[\s,;:]+$/g, "");
+  if (!clean) return "";
+  if (/[.!?…]$/.test(clean)) return clean;
+  return `${clean}.`;
+};
 
 const ensureClinicalContextFormat = (raw = "") => {
   const text = String(raw || "").replace(/\r\n?/g, "\n").trim();
@@ -254,6 +263,8 @@ const ensureClinicalContextFormat = (raw = "") => {
     .filter(Boolean)
     .filter((line) => !/^contexto\s+cl[ií]nico\s*:?$/i.test(line))
     .map((line) => line.replace(/^[-•*]\s*/, "").trim())
+    .filter(Boolean)
+    .map((line) => ensureLineEndsWithPeriod(line))
     .filter(Boolean)
     .map((line) => `- ${line}`);
 
@@ -486,7 +497,9 @@ Formato de salida obligatorio:
 - Empezar exactamente por "CONTEXTO CLÍNICO:" en una línea propia.
 - Usar viñetas con guion para cada dato clínico (una línea por viñeta).
 - Cuando aplique, fusionar en una sola viñeta género + edad + prueba (ej.: "hombre de 45 años, ecografía abdominal").
-- No usar numeración ni subtítulos extra.`;
+- No usar numeración ni subtítulos extra.
+- Orden cronológico: de lo más antiguo a lo más reciente cuando haya fechas o referencias temporales.
+- Cada viñeta debe terminar en punto.`;
 
 const CLINICAL_RECOMMENDATIONS_SYS = `Eres un asistente de radiología orientado a la práctica.
 
@@ -1121,7 +1134,7 @@ function CollapsibleSection({ title, subtitle, isOpen, onToggle, P, children }) 
 }
 
 export default function Page() {
-  const emptyCtx = normalizeCtx({ age: "", birthYear: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: [newEntry()], priorRadiology: [newEntry()], clinicalReports: [newEntry()], freeText: "" });
+  const emptyCtx = normalizeCtx({ age: "", birthDate: "", gender: "", studyRequested: "", priority: "programado", reason: "", clinicalHistory: [newEntry()], priorRadiology: [newEntry()], clinicalReports: [newEntry()], freeText: "", radiologistProfile: "general" });
 
   const [themePref, setThemePref] = useState("auto");
   const [systemDark, setSystemDark] = useState(false);
@@ -1585,6 +1598,7 @@ export default function Page() {
   const reportViewRef = useRef(null);
   const reportSelectionRangeRef = useRef(null);
   const reportSelectionMenuRef = useRef(null);
+  const clinicalContextRef = useRef(null);
 
   const normalizeLabel = (text = "") => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const hasClinicalContextSeed = !!(clinicalContextDraft.trim() || clinicalContextData.structuredText);
@@ -1664,9 +1678,19 @@ export default function Page() {
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onUp); };
   }, []);
 
-  const autoR = (ref) => { if (ref.current) { ref.current.style.height = "auto"; ref.current.style.height = Math.min(ref.current.scrollHeight, 300) + "px"; } };
+  const autoR = (ref, minHeight = 56) => {
+    if (!ref.current) return;
+    ref.current.style.height = "auto";
+    ref.current.style.height = `${Math.max(ref.current.scrollHeight, minHeight)}px`;
+    ref.current.style.overflowY = "hidden";
+  };
+  useEffect(() => autoR(pInpRef), [pInput]);
   useEffect(() => autoR(fInpRef), [fInput]);
   useEffect(() => autoR(cInpRef), [cInput]);
+
+  useEffect(() => {
+    autoR(clinicalContextRef, 90);
+  }, [clinicalContextDraft]);
 
   useEffect(() => {
     if (!isEditingReport) hideReportSelectionMenu();
@@ -2230,7 +2254,7 @@ ${instruction}`;
     ab: { alignSelf: "flex-start", maxWidth: "85%", padding: "9px 13px", borderRadius: "13px 13px 13px 3px", fontSize: 12.5, lineHeight: 1.45, background: P.bubbleAsst, color: P.text2, border: "1px solid " + P.bubbleAsstBorder },
     ia: { padding: "9px 12px", borderTop: "1px solid " + P.goldBorder, background: P.bg2, flexShrink: 0 },
     ir: { display: "flex", gap: 7, alignItems: "flex-end" },
-    ta: (f) => ({ flex: 1, resize: "none", border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), borderRadius: 10, padding: "9px 12px", fontSize: 14, lineHeight: 1.5, background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", minHeight: f ? 140 : 42, maxHeight: 300, overflow: "auto", boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s" }),
+    ta: (f) => ({ flex: 1, resize: "none", border: "1px solid " + (f ? P.goldBorderFocus : P.inputBorder), borderRadius: 10, padding: "9px 12px", fontSize: 14, lineHeight: 1.5, background: f ? P.inputBgFocus : P.inputBg, color: P.text, fontFamily: "'Plus Jakarta Sans',sans-serif", outline: "none", minHeight: f ? 140 : 42, overflowY: "hidden", boxSizing: "border-box", transition: "min-height 0.3s, border-color 0.2s" }),
     sb: (d) => ({ width: 40, height: 40, borderRadius: 10, border: "none", cursor: d ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: d ? (isDark ? "#333" : "#ccc") : "linear-gradient(135deg,#c4973c,#a07830)", color: "#fff", fontSize: 15, flexShrink: 0 }),
     ht: { fontSize: 10, color: P.text4, marginTop: 3 },
     rh: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "8px 10px" : "9px 14px", borderBottom: "1px solid " + P.reportHeaderBorder, background: P.reportHeader, flexShrink: 0, flexWrap: "wrap", gap: 5 },
@@ -2506,6 +2530,21 @@ ${instruction}`;
           {rTab === "petition" && <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
             <div style={{ ...S.rc, background: linkedPanelBg, fontSize: 13, lineHeight: 1.5 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
+                    <div style={{ marginBottom: 10, fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>Opciones de petición</div>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+                      <input type="number" min="0" max="120" value={ctx.age} onChange={(e) => setCtx(prev => ({ ...prev, age: e.target.value }))} placeholder="Edad" style={S.inp(false)} />
+                      <input type="date" value={ctx.birthDate} onChange={(e) => setCtx(prev => ({ ...prev, birthDate: e.target.value }))} style={S.inp(false)} />
+                      <select value={ctx.gender} onChange={(e) => setCtx(prev => ({ ...prev, gender: e.target.value }))} style={S.sel}><option value="">Género</option><option value="mujer">Mujer</option><option value="hombre">Hombre</option><option value="otro">Otro</option></select>
+                      <select value={ctx.studyRequested} onChange={(e) => setCtx(prev => ({ ...prev, studyRequested: e.target.value }))} style={S.sel}><option value="">Tipo de exploración</option><option value="TC">TC</option><option value="RM">RM</option><option value="RX">RX</option><option value="Ecografía">Ecografía</option><option value="PET-TC">PET-TC</option><option value="AngioTC">AngioTC</option></select>
+                      <select value={ctx.radiologistProfile || "general"} onChange={(e) => setCtx(prev => ({ ...prev, radiologistProfile: e.target.value }))} style={{ ...S.sel, gridColumn: isMobile ? "auto" : "1 / -1" }}>
+                        <option value="general">Perfil radiológico general</option>
+                        <option value="estudiante_mama">Estudiante radiología de mama</option>
+                        <option value="urgencias">Radiólogo de urgencias</option>
+                        <option value="musculoesqueletico">Radiólogo musculoesquelético</option>
+                      </select>
+                    </div>
+                  </div>
                     <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
                       <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: P.recoTitleColor }}>Contexto clínico</div>
@@ -2535,11 +2574,12 @@ ${instruction}`;
                         </div>
                       </div>
                       <textarea
+                        ref={clinicalContextRef}
                         value={clinicalContextDraft}
                         onChange={(e) => setClinicalContextDraft(e.target.value)}
                         onBlur={handleClinicalContextBlur}
                         placeholder="Escribe o pega aquí el contexto clínico..."
-                        style={{ width: "100%", minHeight: 72, resize: "vertical", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
+                        style={{ width: "100%", minHeight: 72, resize: "none", overflowY: "hidden", borderRadius: 8, border: "1px solid " + P.chatInputBorder, background: P.chatInputBg, color: P.chatInputColor, padding: "10px 12px", fontFamily: "inherit", fontSize: 13, lineHeight: 1.5, outline: "none" }}
                       />
                     </div>
                     <div style={{ padding: "14px 16px", background: linkedCardBg, border: "1px solid " + tabSurfaceBorder, borderRadius: 10 }}>
@@ -2612,6 +2652,14 @@ ${instruction}`;
                     title="Añade normalidad estructurada y más detalle profesional"
                   >
                     {ldReportAdjust ? "⏳ Ajustando..." : "🧩 Añadir detalles"}
+                  </button>
+                  <button
+                    onClick={() => adjustReport("essential")}
+                    disabled={ldReportAdjust || ldReport || !report}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "none", cursor: ldReportAdjust || ldReport ? "wait" : !report ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: "linear-gradient(135deg,#6366f1,#4338ca)", color: "#fff", opacity: !report ? 0.6 : 1 }}
+                    title="Procesar y corregir automáticamente el texto del informe"
+                  >
+                    {ldReportAdjust ? "⏳" : "🤖 Corregir"}
                   </button>
                   <button onClick={startEditReport} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid " + P.goldBorder, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit", background: P.goldBg, color: P.gold }}>✏️ Editar</button>
                 </>
@@ -2707,7 +2755,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
           </div>}
 
           {rTab === "analysis" && <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? "14px 12px" : "16px 18px" }}>
-            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isAnalysisEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isAnalysisEmpty ? 78 : 220, display: "flex", flexDirection: "column", flex: isAnalysisEmpty ? "0 0 auto" : 1 }}>
               <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Análisis del caso</span></div>
               <div style={{ ...S.rc, background: linkedCardBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isAnalysisEmpty ? "0 0 auto" : 1, padding: isAnalysisEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
                 <div style={{ flex: 1 }}>
@@ -2724,7 +2772,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
               </div>
             </div>
 
-            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isKeyIdeasEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isKeyIdeasEmpty ? 78 : 220, display: "flex", flexDirection: "column", flex: isKeyIdeasEmpty ? "0 0 auto" : 1 }}>
               <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Ideas Clave</span></div>
               <div style={{ ...S.rc, background: linkedCardBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isKeyIdeasEmpty ? "0 0 auto" : 1, padding: isKeyIdeasEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
                 <div style={{ flex: 1 }}>
@@ -2742,7 +2790,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
             </div>
 
 
-            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isDiffDiagEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isDiffDiagEmpty ? 78 : 220, display: "flex", flexDirection: "column", flex: isDiffDiagEmpty ? "0 0 auto" : 1 }}>
               <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Diagnóstico Diferencial</span></div>
               <div style={{ ...S.rc, background: linkedCardBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isDiffDiagEmpty ? "0 0 auto" : 1, padding: isDiffDiagEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
                 <div style={{ flex: 1 }}>
@@ -2760,7 +2808,7 @@ ${isDark ? `.rpt-content p[style*="color:#222"],.rpt-content p[style*="color:#33
               {diffDiag && <div style={{ ...S.lg, borderColor: P.diffDiagHeaderBorder }}>{[["#dc2626", "Más probable"], ["#ea580c", "Probable"], ["#ca8a04", "Menos probable"], ["#16a34a", "Descartado"]].map(([c, l]) => <div key={c} style={S.li}><div style={S.ld(c)} /><span>{l}</span></div>)}</div>}
             </div>
 
-            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isMindMapEmpty ? 78 : 220, display: "flex", flexDirection: "column" }}>
+            <div style={{ border: "1px solid " + tabSurfaceBorder, borderRadius: 12, overflow: "hidden", minHeight: isMindMapEmpty ? 78 : 220, display: "flex", flexDirection: "column", flex: isMindMapEmpty ? "0 0 auto" : 1 }}>
               <div style={{ ...S.rh, background: linkedHeaderBg, borderColor: tabSurfaceBorder }}><span style={{ ...S.rt, color: P.text }}>Mapa Mental</span></div>
               <div style={{ ...S.rc, background: linkedCardBg, display: "flex", gap: 8, alignItems: "flex-start", flex: isMindMapEmpty ? "0 0 auto" : 1, padding: isMindMapEmpty ? (isMobile ? "10px 12px" : "10px 14px") : S.rc.padding }}>
                 <div style={{ flex: 1 }}>
