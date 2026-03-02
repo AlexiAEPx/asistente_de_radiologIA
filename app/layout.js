@@ -1,6 +1,10 @@
 export const metadata = {
   title: "asistente_de_radiologIA",
   description: "Estación de trabajo radiológico con IA — by Alexis Espinosa",
+  icons: {
+    icon: "/api/logo",
+    apple: "/api/logo",
+  },
 };
 
 export default function RootLayout({ children }) {
